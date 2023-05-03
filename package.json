@@ -1,6 +1,6 @@
 {
     "name": "platapi",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "description": "The easiest way to create an API to love.",
     "main": "./lib/src/index.js",
     "types": "./lib/src/index.d.ts",
@@ -8,7 +8,8 @@
     "scripts": {
         "build": "rm -Rf ./lib && tsc -p . && cp package.json lib/",
         "prepublishOnly": "npm_config_yes=true npx husky-init && yarn husky set .husky/pre-commit \"npx pretty-quick --staged\" && husky install && npm run build",
-        "test": "LOG_LEVEL=debug jest"
+        "test": "LOG_LEVEL=debug jest",
+        "prepare": "husky install"
     },
     "bin": {
         "platapi": "./lib/scripts/platapi.js"

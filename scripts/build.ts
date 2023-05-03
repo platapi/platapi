@@ -23,25 +23,29 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
     const routes = Utils.generateAPIRoutesFromFiles(apiConfig.apiRootDirectory ?? "./api");
 
     const serverFile = `
-    import { PlatAPI } from "../../src";
-    
-    const ___apiConfig:any ${configFile.replace("module.exports", "")}
-    
-    if(!___apiConfig.routes)
-    {
-        ___apiConfig.routes = [];
-    }
+import { PlatAPI } from "../../src";
+
+${configFile}
+
+const ___apiConfig = module.exports;
+
+if(!___apiConfig.routes)
+{
+    ___apiConfig.routes = [];
+}
     
     ${routes
         .map(
-            route => `___apiConfig.routes.push({
+            route => `
+___apiConfig.routes.push({
     endpoint: "${route.endpoint}",
     import: () => import("${route.file!.replace(/.ts$/, "")}")
-    });`
+});
+    `
         )
         .join("\n")}
     
-    module.exports.handler = new PlatAPI(___apiConfig).handler;
+module.exports.handler = new PlatAPI(___apiConfig).handler;
     `;
 
     await fs.outputFile(cacheDir + "/server.ts", serverFile);

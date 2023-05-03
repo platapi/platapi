@@ -1,4 +1,4 @@
-import { Cookie, Get, Header, Optional, Options, Post, Put, Request, Patch, WholeBody } from "../../../../src";
+import { Cookie, Get, Header, Optional, Options, Post, Put, Request, Patch, Body } from "../../../../src";
 import { Persons, Person } from "../../../sample-types/Person";
 
 export default class SampleAPIWithPathParams {
@@ -45,7 +45,7 @@ export default class SampleAPIWithPathParams {
     static patchAValue(
         pathParam1: string,
         pathParam2: string,
-        @WholeBody
+        @Body
         person: Person
     ): Persons {
         return [];

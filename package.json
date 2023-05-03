@@ -1,13 +1,13 @@
 {
     "name": "platapi",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "description": "The easiest way to create an API to love.",
     "main": "./lib/src/index.js",
     "types": "./lib/src/index.d.ts",
     "repository": "https://github.com/jheising/platapi",
     "scripts": {
-        "build": "rm -Rf ./lib && tsc -p . && cp package.json lib/",
-        "prepublishOnly": "npm_config_yes=true npx husky-init && yarn husky set .husky/pre-commit \"npx pretty-quick --staged\" && husky install && npm run build",
+        "deploy-build": "rm -Rf ./lib && tsc -p . && cp package.json ./lib",
+        "prepublishOnly": "npm_config_yes=true npx husky-init && yarn husky set .husky/pre-commit \"npx pretty-quick --staged\" && husky install && npm run deploy-build",
         "test": "LOG_LEVEL=debug jest",
         "prepare": "husky install"
     },
@@ -67,7 +67,6 @@
         "ts-node-dev": "^1.1.8",
         "ts-simple-ast": "^21.0.4",
         "typescript": "^4.6.4",
-        "typescript-json-schema": "^0.56.0",
-        "yargs": "^17.4.1"
+        "typescript-json-schema": "^0.56.0"
     }
 }

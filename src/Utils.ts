@@ -3,35 +3,48 @@ import functionArguments from "function-arguments";
 import mergeWith from "lodash/mergeWith";
 import path from "path";
 import isArray from "lodash/isArray";
-import { InputParameterRequirement, ManagedAPIHandlerConfig } from "./Types";
+import { PlatAPIInputParameterRequirement, PlatAPIManagedAPIHandlerConfig, PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "./Types";
 import castArray from "lodash/castArray";
 import fs from "fs";
-import { PlatAPIConfig } from "./PlatAPI";
 import isFunction from "lodash/isFunction";
-
-export interface Route {
-    endpoint: string;
-    file: string;
-}
+import isString from "lodash/isString";
+import defaults from "lodash/defaults";
 
 const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
-    static getAPIConfig(configPath?: string): PlatAPIConfig {
-        try {
-            configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE ?? "api.config.js");
+    static getAPIConfig(config?: string | Partial<PlatAPIConfig>): PlatAPIConfigObject {
 
-            let config = require(configPath);
-            if (isFunction(config)) {
-                config = config();
+        let configObject = isString(config) ? undefined : config as PlatAPIConfigObject | undefined;
+
+        if (!configObject) {
+            let configPath = isString(config) ? config as string : undefined;
+
+            try {
+                configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE ?? "api.config.js");
+
+                configObject = require(configPath);
+                if (isFunction(config)) {
+                    configObject = config();
+                }
+            } catch (e) {
+                // No config file present
             }
-            return config;
-        } catch (e) {
-            // No config file present
         }
 
-        return {};
+        const defaultConfig: PlatAPIConfig = {
+            info: {
+                title: "My API",
+                version: "1.0.0"
+            },
+            apiRootDirectory: path.resolve(process.cwd(), process.env.API_ROOT_DIRECTORY ?? "./api"),
+            apiPort: Number(process.env.API_PORT ?? 3000),
+            returnFriendlyResponses: false,
+            loadStandardMiddleware: true
+        };
+
+        return defaults({}, configObject, defaultConfig);
     }
 
     static walkFileTree(directory: string, tree: string[] = []): string[] {
@@ -68,13 +81,13 @@ export class Utils {
         });
     }
 
-    public static setManagedAPIHandlerConfig(handler: Function, config: Partial<ManagedAPIHandlerConfig>) {
+    public static setManagedAPIHandlerConfig(handler: Function, config: Partial<PlatAPIManagedAPIHandlerConfig>) {
         const handlerConfig = (handler as any).__handler ?? {};
         Utils.mergeObjects(handlerConfig, config);
         (handler as any).__handler = handlerConfig;
     }
 
-    public static getManagedAPIHandlerConfig(handler: Function): ManagedAPIHandlerConfig | undefined {
+    public static getManagedAPIHandlerConfig(handler: Function): PlatAPIManagedAPIHandlerConfig | undefined {
         return (handler as any).__handler;
     }
 
@@ -111,7 +124,7 @@ export class Utils {
         }, 0);
     }
 
-    public static generateAPIRoutesFromFiles(rootDirectory: string): Route[] {
+    public static generateAPIRoutesFromFiles(rootDirectory: string): PlatAPIRoute[] {
         rootDirectory = path.resolve(rootDirectory);
 
         try {
@@ -152,7 +165,7 @@ export class Utils {
         };
     }
 
-    static generateMethodDecorator(config: Partial<ManagedAPIHandlerConfig>): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void {
+    static generateMethodDecorator(config: Partial<PlatAPIManagedAPIHandlerConfig>): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void {
         return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
             // @ts-ignore
             const handlerFunction: Function = target[propertyKey];
@@ -160,7 +173,7 @@ export class Utils {
         };
     }
 
-    static generateParameterDecorator(requirements: Partial<InputParameterRequirement>): (target: Object, propertyKey: string | symbol, parameterIndex: number) => void {
+    static generateParameterDecorator(requirements: Partial<PlatAPIInputParameterRequirement>): (target: Object, propertyKey: string | symbol, parameterIndex: number) => void {
         return (target: Object, propertyKey: string | symbol, parameterIndex: number) => {
             const [handlerFunction, parameterName] = Utils.getHandlerAndParameterName(target, propertyKey, parameterIndex);
             Utils.setManagedAPIHandlerConfig(handlerFunction, {

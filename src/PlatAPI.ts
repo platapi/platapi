@@ -2,112 +2,44 @@ import express from "express";
 import bodyParser from "body-parser";
 // @ts-ignore
 import cookieParser from "cookie-parser";
-import path from "path";
 // @ts-ignore
 import isLambda from "is-lambda";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { Server } from "http";
 import { Express, Request, Response, NextFunction } from "express/ts4.0";
-import log, { Logger, LogLevelDesc } from "loglevel";
+import log, { Logger } from "loglevel";
 import { nanoid } from "nanoid";
 import get from "lodash/get";
 import has from "lodash/has";
 import isNil from "lodash/isNil";
 import isArray from "lodash/isArray";
-import { Route, Utils } from "./Utils";
+import { Utils } from "./Utils";
 import { ErrorRequestHandler } from "express-serve-static-core";
 import cors from "cors";
 import wcmatch from "wildcard-match";
 import {
     PlatAPIResponse,
-    PlatAPIRoute,
-    FriendlyAPIResponseFailure,
-    FriendlyAPIResponseSuccess,
-    InputParameterRequirements,
-    ManagedAPIHandler,
-    ManagedAPIHandlerConfig,
-    ResponseFormatter
+    PlatAPIFriendlyResponseFailure,
+    PlatAPIFriendlyResponseSuccess,
+    PlatAPIInputParameterRequirements,
+    PlatAPIManagedAPIHandler,
+    PlatAPIManagedAPIHandlerConfig,
+    PlatAPIResponseFormatter, PlatAPIConfigObject, PlatAPIConfig, PlatAPIRoute, PlatAPIFriendlyError
 } from "./Types";
-import type { InfoObject } from "openapi3-ts/src/model/openapi31";
 
-interface ExtendedRoute extends Route {
+interface ExtendedRoute extends PlatAPIRoute {
     import?: () => Promise<any>;
-}
-
-export interface PlatAPIConfig {
-    info?: InfoObject;
-
-    /**
-     * The server port to listen on. Defaults to 3000. May also be set with environment variable API_PORT. This setting is ignored when running on Lambda.
-     */
-    apiPort?: number;
-
-    /**
-     * If set to true, standard middleware like body-parser and cookie-parser will be loaded by default. Defaults to true.
-     */
-    loadStandardMiddleware?: boolean;
-
-    /**
-     * List of CORS origins that will be allowed in the request. Wildcards supported.
-     */
-    corsWhitelist?: string[];
-
-    /**
-     * Pass in an existing express app instance.
-     */
-    app?: Express;
-
-    logLevel?: LogLevelDesc;
-
-    /**
-     * Specify a handler function if you want to add any additional information to the logging context for a request. Just modify the passed `context` object with your own data.
-     * @param req - The express.js request
-     * @param context - The context object you can modify with your own data
-     */
-    logContextHandler?: (req: Request, context: any) => void;
-
-    routes?: PlatAPIRoute[];
-
-    /**
-     * The directory with which to serve API routes. Defaults to "./api". May also be set with environment variable API_ROOT.
-     */
-    apiRootDirectory?: string;
-
-    /**
-     * Return HAPI responses (https://github.com/jheising/HAPI). Defaults to true.
-     */
-    returnFriendlyResponses?: boolean;
-
-    binaryMediaTypes?: string[];
-}
-
-export interface APIFriendlyError extends Error {
-    statusCode: number;
-    friendlyMessage?: string;
-    id: string;
 }
 
 export class PlatAPI {
     readonly handler?: APIGatewayProxyHandler;
     readonly app?: Express;
     readonly server?: Server;
-    readonly config?: PlatAPIConfig;
+    readonly config: PlatAPIConfigObject;
     static readonly logger = log;
 
-    private static _initializeConfig(config: PlatAPIConfig = {}): PlatAPIConfig {
-        return {
-            returnFriendlyResponses: true,
-            loadStandardMiddleware: true,
-            apiRootDirectory: path.resolve(process.cwd(), process.env.API_ROOT ?? "./api"),
-            apiPort: Number(process.env.API_PORT ?? 3000),
-            ...config
-        };
-    }
-
-    constructor(config: PlatAPIConfig = {}) {
-        config = PlatAPI._initializeConfig(config);
-
-        this.config = config;
+    constructor(config?: PlatAPIConfig) {
+        this.config = Utils.getAPIConfig(config);
 
         log.setLevel((process.env.LOG_LEVEL as any) ?? "error");
 
@@ -115,7 +47,7 @@ export class PlatAPI {
 
         log.info(packageInfo.name, packageInfo.version);
 
-        this.app = config.app ?? express();
+        this.app = this.config.app ?? express();
 
         // Create our contextual logger
         this.app.use((req, res, next) => {
@@ -124,8 +56,8 @@ export class PlatAPI {
                 url: req.url
             };
 
-            if (config.logContextHandler) {
-                config.logContextHandler(req, context);
+            if (this.config.logContextHandler) {
+                this.config.logContextHandler(req, context);
             }
 
             const requestLogger = this._createContextualLogger(nanoid(), this._sanitizeObject(context));
@@ -144,8 +76,8 @@ export class PlatAPI {
             next();
         });
 
-        if (config.corsWhitelist) {
-            const isMatch = wcmatch(config.corsWhitelist);
+        if (this.config.corsWhitelist) {
+            const isMatch = wcmatch(this.config.corsWhitelist);
             this.app.use(
                 cors({
                     origin: (requestOrigin, callback) => {
@@ -156,7 +88,7 @@ export class PlatAPI {
             );
         }
 
-        if (config.loadStandardMiddleware) {
+        if (this.config.loadStandardMiddleware) {
             this.app.use(cookieParser());
             this.app.use(
                 bodyParser.urlencoded({
@@ -167,15 +99,15 @@ export class PlatAPI {
             this.app.use(bodyParser.text());
         }
 
-        let apiRoutes = config.routes as ExtendedRoute[];
+        let apiRoutes = this.config.routes as ExtendedRoute[];
 
         // If routes aren't directly specified, then we can use file-system routing
         if (!apiRoutes) {
-            log.info("Loading API routes from", config.apiRootDirectory);
-            apiRoutes = Utils.generateAPIRoutesFromFiles(config.apiRootDirectory as string);
+            log.info("Loading API routes from", this.config.apiRootDirectory);
+            apiRoutes = Utils.generateAPIRoutesFromFiles(this.config.apiRootDirectory as string);
 
             if (apiRoutes.length === 0) {
-                log.warn("No API routes found at", config.apiRootDirectory);
+                log.warn("No API routes found at", this.config.apiRootDirectory);
             }
         }
 
@@ -234,19 +166,19 @@ export class PlatAPI {
             const serverless = require("serverless-http");
             const serverlessOptions: any = {};
 
-            if (config.binaryMediaTypes) {
-                serverlessOptions.binary = config.binaryMediaTypes;
+            if (this.config.binaryMediaTypes) {
+                serverlessOptions.binary = this.config.binaryMediaTypes;
             }
 
             this.handler = serverless(this.app, serverlessOptions);
         } else {
-            this.server = this.app.listen(config.apiPort);
-            log.info(`API Started on port`, config.apiPort);
+            this.server = this.app.listen(this.config.apiPort);
+            log.info(`API Started on port`, this.config.apiPort);
         }
     }
 
-    static createAPIFriendlyError(friendlyMessage?: string, statusCode: number = 500, rawError?: Error): APIFriendlyError {
-        const friendlyError: APIFriendlyError = (rawError ?? new Error(friendlyMessage ?? "unknown")) as any;
+    static createAPIFriendlyError(friendlyMessage?: string, statusCode: number = 500, rawError?: Error): PlatAPIFriendlyError {
+        const friendlyError: PlatAPIFriendlyError = (rawError ?? new Error(friendlyMessage ?? "unknown")) as any;
 
         if (friendlyMessage) {
             friendlyError.friendlyMessage = friendlyMessage;
@@ -256,11 +188,11 @@ export class PlatAPI {
         return friendlyError;
     }
 
-    static createNotFoundError(): APIFriendlyError {
+    static createNotFoundError(): PlatAPIFriendlyError {
         return PlatAPI.createAPIFriendlyError("Not found", 404);
     }
 
-    static createUnauthorizedError(rawError?: Error): APIFriendlyError {
+    static createUnauthorizedError(rawError?: Error): PlatAPIFriendlyError {
         return PlatAPI.createAPIFriendlyError("Unauthorized", 401, rawError);
     }
 
@@ -276,16 +208,16 @@ export class PlatAPI {
         throw PlatAPI.createAPIFriendlyError(friendlyMessage, statusCode, rawError);
     }
 
-    private static _getManagedHandler(theObject: any, httpMethod: string): ManagedAPIHandler | undefined {
+    private static _getManagedHandler(theObject: any, httpMethod: string): PlatAPIManagedAPIHandler | undefined {
         // Is there a key on this object that contains the
         const handler = theObject[httpMethod.toLowerCase()] ?? theObject[httpMethod.toUpperCase()];
 
-        let handlerConfig: ManagedAPIHandlerConfig | undefined;
+        let handlerConfig: PlatAPIManagedAPIHandlerConfig | undefined;
         let handlerFunction: Function | undefined;
 
-        if (isArray(handler) && (handler as ManagedAPIHandler).length >= 2) {
-            handlerConfig = { ...(handler as ManagedAPIHandler)[0] };
-            handlerFunction = (handler as ManagedAPIHandler)[1];
+        if (isArray(handler) && (handler as PlatAPIManagedAPIHandler).length >= 2) {
+            handlerConfig = { ...(handler as PlatAPIManagedAPIHandler)[0] };
+            handlerFunction = (handler as PlatAPIManagedAPIHandler)[1];
         } else if (theObject.__httpMethods?.[httpMethod.toUpperCase()]) {
             handlerFunction = theObject[theObject.__httpMethods?.[httpMethod.toUpperCase()]];
             if (handlerFunction) {
@@ -334,7 +266,7 @@ export class PlatAPI {
         return newLogger;
     }
 
-    private _defaultResponseFormatter = (response: any, statusCode: number): FriendlyAPIResponseSuccess | FriendlyAPIResponseFailure => {
+    private _defaultResponseFormatter = (response: any, statusCode: number): PlatAPIFriendlyResponseSuccess | PlatAPIFriendlyResponseFailure => {
         if (statusCode <= 299) {
             if (this.config?.returnFriendlyResponses === false) {
                 return response;
@@ -353,7 +285,7 @@ export class PlatAPI {
         }
     };
 
-    private _sendResponse(res: Response, response: any, statusCode: number = 200, responseFormatter: ResponseFormatter = this._defaultResponseFormatter) {
+    private _sendResponse(res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
         const formattedResponse = responseFormatter(response, statusCode);
         res.status(statusCode).send(formattedResponse);
     }
@@ -363,7 +295,7 @@ export class PlatAPI {
         return theObject;
     }
 
-    private static _processInputParams(req: Request, res: Response, requirements: InputParameterRequirements): { [paramName: string]: any } {
+    private static _processInputParams(req: Request, res: Response, requirements: PlatAPIInputParameterRequirements): { [paramName: string]: any } {
         const output: any = {};
 
         Object.entries(requirements).forEach(([paramName, requirement]) => {
@@ -408,7 +340,7 @@ export class PlatAPI {
         return output;
     }
 
-    private async _handleRequest(handler: ManagedAPIHandler, req: Request, res: PlatAPIResponse, next: NextFunction) {
+    private async _handleRequest(handler: PlatAPIManagedAPIHandler, req: Request, res: PlatAPIResponse, next: NextFunction) {
         try {
             let result;
             let [handlerConfig, handlerFunction] = handler;

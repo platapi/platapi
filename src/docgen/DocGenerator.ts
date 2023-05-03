@@ -6,11 +6,12 @@ import * as TJS from "typescript-json-schema";
 import crypto from "crypto";
 import fs from "fs";
 import os from "os";
-import { PlatAPI, PlatAPIConfig } from "../PlatAPI";
+import { PlatAPI } from "../PlatAPI";
 import defaultsDeep from "lodash/defaultsDeep";
 import isString from "lodash/isString";
 import set from "lodash/set";
-import { Route, Utils } from "../Utils";
+import { Utils } from "../Utils";
+import { PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "../Types";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
 
@@ -45,16 +46,12 @@ const HAPI_FAILURE_SCHEMA = {
 
 export class DocGenerator {
     static async generateDocs(config: PlatAPIConfig): Promise<OpenAPIObject> {
-        // @ts-ignore
-        config = PlatAPI._initializeConfig(config);
-        const apiRootDirectory = path.resolve(config.apiRootDirectory!);
+        const configObject = Utils.getAPIConfig(config);
+        const apiRootDirectory = path.resolve(configObject.apiRootDirectory);
 
         const apiSpec: OpenAPIObject = {
             openapi: "3.1.0",
-            info: config.info ?? {
-                title: "My API",
-                version: "1.0.0"
-            },
+            info: configObject.info,
             paths: {},
             components: {
                 schemas: {}
@@ -188,12 +185,11 @@ export class DocGenerator {
                     const decoratorName = decorator.getName();
 
                     switch (decoratorName) {
-                        case "Body": {
+                        case "BodyPart": {
                             isPublicParameter = false;
                             break;
                         }
-                        case "AllBody":
-                        case "WholeBody": {
+                        case "Body": {
                             isPublicParameter = false;
                             requestBodyType = parameter.getType();
                             break;
@@ -267,7 +263,7 @@ export class DocGenerator {
             }
 
             const returnType = method.getReturnType();
-            endpoint.responses = DocGenerator._generateResponseSchema(returnType, apiSpec, schemaProgram, config);
+            endpoint.responses = DocGenerator._generateResponseSchema(returnType, apiSpec, schemaProgram, configObject);
 
             // Does this method have any overriding documentation?
             const docsDecorator = method.getDecorator("Docs");
@@ -282,7 +278,8 @@ export class DocGenerator {
                             ...handlerSettings.docs
                         };
                     }
-                } catch (e) {}
+                } catch (e) {
+                }
             }
 
             set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);
@@ -291,7 +288,7 @@ export class DocGenerator {
         return apiSpec;
     }
 
-    private static _generateResponseSchema(type: Type, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfig): ResponsesObject {
+    private static _generateResponseSchema(type: Type, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfigObject): ResponsesObject {
         const responses: ResponsesObject = {};
 
         let returnTypeSchema = DocGenerator._generateAPISchema(type, apiSpec, program);
@@ -383,7 +380,7 @@ export class DocGenerator {
         return result.charAt(0).toUpperCase() + result.slice(1);
     }
 
-    private static _forEachEndpoint(routes: Route[], predicate: (route: Route, method: MethodDeclaration, httpMethodName: string, sourceFile: SourceFile) => void) {
+    private static _forEachEndpoint(routes: PlatAPIRoute[], predicate: (route: PlatAPIRoute, method: MethodDeclaration, httpMethodName: string, sourceFile: SourceFile) => void) {
         for (let route of routes) {
             if (!route.file) {
                 continue;

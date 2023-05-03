@@ -1,6 +1,6 @@
 import { Utils } from "./Utils";
 import castArray from "lodash/castArray";
-import { PlatAPIRequestHandler, InputParameterRequirement, ResponseFormatter } from "./Types";
+import { PlatAPIRequestHandler, PlatAPIInputParameterRequirement, PlatAPIResponseFormatter } from "./Types";
 import { OperationObject } from "openapi3-ts/src/model/openapi31";
 
 export const Post = Utils.generateHTTPMethodDecorator("POST");
@@ -12,13 +12,12 @@ export const Options = Utils.generateHTTPMethodDecorator("OPTIONS");
 export const Head = Utils.generateHTTPMethodDecorator("HEAD");
 export const Trace = Utils.generateHTTPMethodDecorator("TRACE");
 
-export const Param = (requirements: InputParameterRequirement) => {
+export const Param = (requirements: PlatAPIInputParameterRequirement) => {
     return Utils.generateParameterDecorator(requirements);
 };
 
-export const Body = Utils.generateParameterSourceDecorator(["request", "body"]);
-export const AllBody = Utils.generateParameterSourceDecorator(["request", "body"], true, false);
-export const WholeBody = AllBody;
+export const BodyPart = Utils.generateParameterSourceDecorator(["request", "body"]);
+export const Body = Utils.generateParameterSourceDecorator(["request", "body"], true, false);
 
 export const Cookie = Utils.generateParameterSourceDecorator(["request", "cookies"]);
 export const AllCookies = Utils.generateParameterSourceDecorator(["request", "cookies"], true);
@@ -44,7 +43,7 @@ export const Required = Utils.generateParameterDecorator({
     required: true
 });
 
-export const FormatResponse = (formatter: ResponseFormatter, contentType?: string) => {
+export const FormatResponse = (formatter: PlatAPIResponseFormatter, contentType?: string) => {
     return Utils.generateMethodDecorator({
         responseFormatter: formatter,
         responseContentType: contentType

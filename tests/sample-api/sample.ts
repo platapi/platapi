@@ -1,14 +1,14 @@
-import { Cookie, Post, Header, Body, Optional, Docs, Get } from "../../src";
+import { Cookie, Post, Header, BodyPart, Optional, Docs, Get } from "../../src";
 import { Person } from "../sample-types/Person";
 
 export default class SampleAPI {
     @Get
     static postWithPartialBody(
-        @Body
+        @BodyPart
         bodyParam1: string,
-        @Body
+        @BodyPart
         bodyParam2: number = 5,
-        @Body
+        @BodyPart
         bodyParam3?: Person
     ) {}
 }

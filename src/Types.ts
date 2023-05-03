@@ -1,20 +1,69 @@
-import { Logger } from "loglevel";
-import { RequestHandler, Request, Response } from "express/ts4.0";
-import { Route } from "./Utils";
-import { OperationObject } from "openapi3-ts/src/model/openapi31";
+import type { Logger, LogLevelDesc } from "loglevel";
+import type { RequestHandler, Request, Response } from "express/ts4.0";
+import type { InfoObject, OperationObject } from "openapi3-ts/src/model/openapi31";
+import type { Express } from "express";
 
-export interface FriendlyAPIResponseSuccess<T = any> {
+export interface PlatAPIConfigObject {
+    info: InfoObject;
+
+    /**
+     * The server port to listen on. Defaults to 3000. May also be set with environment variable API_PORT. This setting is ignored when running on Lambda.
+     */
+    apiPort: number;
+
+    /**
+     * If set to true, standard middleware like body-parser and cookie-parser will be loaded by default. Defaults to true.
+     */
+    loadStandardMiddleware?: boolean;
+
+    /**
+     * List of CORS origins that will be allowed in the request. Wildcards supported.
+     */
+    corsWhitelist?: string[];
+
+    /**
+     * Pass in an existing express app instance.
+     */
+    app?: Express;
+
+    logLevel?: LogLevelDesc;
+
+    /**
+     * Specify a handler function if you want to add any additional information to the logging context for a request. Just modify the passed `context` object with your own data.
+     * @param req - The express.js request
+     * @param context - The context object you can modify with your own data
+     */
+    logContextHandler?: (req: Request, context: any) => void;
+
+    routes?: PlatAPIRoute[];
+
+    /**
+     * The directory with which to serve API routes. Defaults to "./api". May also be set with environment variable API_ROOT_DIRECTORY.
+     */
+    apiRootDirectory: string;
+
+    /**
+     * Return HAPI responses (https://github.com/jheising/HAPI). Defaults to false.
+     */
+    returnFriendlyResponses?: boolean;
+
+    binaryMediaTypes?: string[];
+}
+
+export type PlatAPIConfig = Partial<PlatAPIConfigObject> | string;
+
+export interface PlatAPIFriendlyResponseSuccess<T = any> {
     this: "succeeded";
     with: any;
 }
 
-export interface FriendlyAPIResponseFailure<T = any> {
+export interface PlatAPIFriendlyResponseFailure<T = any> {
     this: "failed";
     with: number;
     because?: T;
 }
 
-export interface InputParameterRequirement {
+export interface PlatAPIInputParameterRequirement {
     required?: boolean;
 
     /**
@@ -25,18 +74,18 @@ export interface InputParameterRequirement {
     sources?: (string | string[])[];
 }
 
-export type ResponseFormatter = (outputValue: any, statusCode: number) => any;
+export type PlatAPIResponseFormatter = (outputValue: any, statusCode: number) => any;
 
-export interface ManagedAPIHandlerConfig {
+export interface PlatAPIManagedAPIHandlerConfig {
     responseContentType?: string;
-    responseFormatter?: ResponseFormatter;
+    responseFormatter?: PlatAPIResponseFormatter;
     middleware?: PlatAPIRequestHandler[];
-    params?: InputParameterRequirements;
+    params?: PlatAPIInputParameterRequirements;
     docs?: Partial<OperationObject>;
 }
 
-export type InputParameterRequirements = { [paramName: string]: InputParameterRequirement };
-export type ManagedAPIHandler = [ManagedAPIHandlerConfig, Function];
+export type PlatAPIInputParameterRequirements = { [paramName: string]: PlatAPIInputParameterRequirement };
+export type PlatAPIManagedAPIHandler = [PlatAPIManagedAPIHandlerConfig, Function];
 export type PlatAPILogger = Logger;
 
 export interface PlatAPIRequestLocals {
@@ -49,4 +98,13 @@ export type PlatAPIRequest = Request<any, any, any, any, PlatAPIRequestLocals>;
 export type PlatAPIResponse = Response<any, PlatAPIRequestLocals>;
 export type PlatAPIRequestHandler = RequestHandler<any, any, any, any, PlatAPIRequestLocals>;
 
-export type PlatAPIRoute = Route;
+export interface PlatAPIRoute {
+    endpoint: string;
+    file: string;
+}
+
+export interface PlatAPIFriendlyError extends Error {
+    statusCode: number;
+    friendlyMessage?: string;
+    id: string;
+}

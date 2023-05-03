@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import defaultsDeep from "lodash/defaultsDeep";
 import { spawn } from "child_process";
 import path from "path";
-import { PlatAPIConfig } from "../src";
+import { PlatAPIConfigObject } from "../src";
 import { Utils } from "../src/Utils";
 import { build } from "./build";
 
@@ -39,7 +39,7 @@ program
     .option("-c --config <string>", "the location of your api.config.ts or api.config.js file", "./api.config.js")
     .option("-o, --outfile <string>", "output docs to a file, otherwise will print to console.")
     .action(async (options: any) => {
-        const config: PlatAPIConfig = Utils.getAPIConfig(options.config);
+        const config: PlatAPIConfigObject = Utils.getAPIConfig(options.config);
 
         let docs = await DocGenerator.generateDocs(config);
 

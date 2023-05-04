@@ -1,9 +1,17 @@
-import { Get } from "../../../../src";
+import { BearerToken, GET, Logger } from "../../../../src";
 import { User } from "../../../src/User";
 
 export default class SampleAPI {
-    @Get
-    static async getUserByID(userID: string): Promise<User> {
+    @GET
+    static async getUserByID(
+        userID: string,
+        @BearerToken
+        accessToken: string,
+        @Logger
+        logger: string
+    ): Promise<User> {
+        console.log(accessToken);
+
         return {
             id: userID,
             firstName: "Jill",

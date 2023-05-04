@@ -1,8 +1,8 @@
-import { Cookie, Get, Header, Optional, Options, Post, Put, Request, Patch, Body } from "../../../../src";
+import { Cookie, GET, Header, Optional, OPTIONS, POST, PUT, Request, PATCH, Body } from "../../../../src";
 import { Persons, Person } from "../../../sample-types/Person";
 
 export default class SampleAPIWithPathParams {
-    @Get
+    @GET
     static getAValue(
         pathParam1: string,
         pathParam2: string,
@@ -25,7 +25,7 @@ export default class SampleAPIWithPathParams {
      * @summary Post a value summary
      * @tags Posting
      */
-    @Post
+    @POST
     static async postAValue(
         pathParam1: string,
         pathParam2: string,
@@ -41,7 +41,7 @@ export default class SampleAPIWithPathParams {
         };
     }
 
-    @Patch
+    @PATCH
     static patchAValue(
         pathParam1: string,
         pathParam2: string,
@@ -51,7 +51,7 @@ export default class SampleAPIWithPathParams {
         return [];
     }
 
-    @Put
+    @PUT
     private static privateEndpoint1(pathParam1: string, pathParam2: string) {}
 
     /**
@@ -59,6 +59,6 @@ export default class SampleAPIWithPathParams {
      * @param pathParam1
      * @param pathParam2
      */
-    @Options
+    @OPTIONS
     static privateEndpoint2(pathParam1: string, pathParam2: string) {}
 }

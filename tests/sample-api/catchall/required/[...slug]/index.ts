@@ -1,7 +1,7 @@
-import { Get } from "../../../../../src";
+import { GET } from "../../../../../src";
 
 export default class SampleAPI {
-    @Get
+    @GET
     static getEndpoint(slug: string) {
         return slug;
     }

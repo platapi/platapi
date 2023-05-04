@@ -218,6 +218,25 @@ export class DocGenerator {
                             param.in = "header";
                             break;
                         }
+                        case "BearerToken": {
+                            param.in = "header";
+                            param.name = "Authorization";
+                            param.schema = {
+                                type: "string",
+                                pattern: "^Bearer\\s.+$"
+                            };
+                            param.example = `Bearer V1StGXR8_Z5jdHi6B-myT`;
+
+                            if (!endpoint.security) {
+                                endpoint.security = [];
+                            }
+
+                            if (!endpoint.security.some(sec => sec.bearerAuth)) {
+                                endpoint.security.push({ bearerAuth: [] });
+                            }
+
+                            break;
+                        }
                         case "AllCookies":
                         case "AllPath":
                         case "AllQuery":
@@ -235,7 +254,9 @@ export class DocGenerator {
                     continue;
                 }
 
-                param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaProgram);
+                if (!param.schema) {
+                    param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaProgram);
+                }
 
                 endpoint.parameters?.push(param);
             }
@@ -278,8 +299,7 @@ export class DocGenerator {
                             ...handlerSettings.docs
                         };
                     }
-                } catch (e) {
-                }
+                } catch (e) {}
             }
 
             set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);

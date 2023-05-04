@@ -72,6 +72,8 @@ export interface PlatAPIInputParameterRequirement {
      */
     autoConvert?: boolean;
     sources?: (string | string[])[];
+
+    transformFunction?: (value: any) => any;
 }
 
 export type PlatAPIResponseFormatter = (outputValue: any, statusCode: number) => any;

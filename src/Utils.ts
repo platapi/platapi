@@ -15,11 +15,10 @@ const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
     static getAPIConfig(config?: string | Partial<PlatAPIConfig>): PlatAPIConfigObject {
-
-        let configObject = isString(config) ? undefined : config as PlatAPIConfigObject | undefined;
+        let configObject = isString(config) ? undefined : (config as PlatAPIConfigObject | undefined);
 
         if (!configObject) {
-            let configPath = isString(config) ? config as string : undefined;
+            let configPath = isString(config) ? (config as string) : undefined;
 
             try {
                 configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE ?? "api.config.js");
@@ -186,15 +185,16 @@ export class Utils {
 
     static generateParameterSourceDecorator(
         baseSource: string | string[],
-        includeFullSource: boolean = false,
-        autoConvert: boolean = true
+        parameterNameIsPartOfPath: boolean = true,
+        autoConvert: boolean = true,
+        transformFunction?: (value: any) => any
     ): (target: Object, propertyKey: string | symbol, parameterIndex: number) => void {
         return (target: Object, propertyKey: string | symbol, parameterIndex: number) => {
             const [handlerFunction, parameterName] = Utils.getHandlerAndParameterName(target, propertyKey, parameterIndex);
 
             let source = castArray(baseSource);
 
-            if (!includeFullSource) {
+            if (parameterNameIsPartOfPath) {
                 source = [...source, parameterName];
             }
 
@@ -202,7 +202,8 @@ export class Utils {
                 params: {
                     [parameterName]: {
                         autoConvert: autoConvert,
-                        sources: [source]
+                        sources: [source],
+                        transformFunction: transformFunction
                     }
                 }
             });

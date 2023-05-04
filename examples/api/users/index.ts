@@ -1,8 +1,8 @@
-import { Body, Post } from "../../../src";
+import { Body, POST } from "../../../src";
 import { User } from "../../src/User";
 
 export default class SampleAPI {
-    @Post
+    @POST
     static async createUser(
         @Body
         user: User

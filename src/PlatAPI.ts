@@ -24,7 +24,11 @@ import {
     PlatAPIInputParameterRequirements,
     PlatAPIManagedAPIHandler,
     PlatAPIManagedAPIHandlerConfig,
-    PlatAPIResponseFormatter, PlatAPIConfigObject, PlatAPIConfig, PlatAPIRoute, PlatAPIFriendlyError
+    PlatAPIResponseFormatter,
+    PlatAPIConfigObject,
+    PlatAPIConfig,
+    PlatAPIRoute,
+    PlatAPIFriendlyError
 } from "./Types";
 
 interface ExtendedRoute extends PlatAPIRoute {
@@ -315,6 +319,7 @@ export class PlatAPI {
                 ["request", "query", paramName],
                 ["request", "body", paramName]
             ];
+
             const foundPath = inputSourcePaths.find(path => has(inputSource, path));
 
             if (foundPath) {
@@ -327,6 +332,10 @@ export class PlatAPI {
                     } catch (e) {
                         // ignore
                     }
+                }
+
+                if (requirement.transformFunction) {
+                    paramValue = requirement.transformFunction(paramValue);
                 }
             }
 

@@ -1,4 +1,4 @@
-import { BearerToken, GET, Logger } from "../../../../src";
+import { BearerToken, GET, Logger, PlatAPILogger } from "../../../../src";
 import { User } from "../../../src/User";
 
 export default class SampleAPI {
@@ -6,12 +6,8 @@ export default class SampleAPI {
     static async getUserByID(
         userID: string,
         @BearerToken
-        accessToken: string,
-        @Logger
-        logger: string
+        accessToken: string
     ): Promise<User> {
-        console.log(accessToken);
-
         return {
             id: userID,
             firstName: "Jill",

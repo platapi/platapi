@@ -23,7 +23,7 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
     const routes = Utils.generateAPIRoutesFromFiles(apiConfig.apiRootDirectory ?? "./api");
 
     const serverFile = `
-import { PlatAPI } from "../../src";
+import { PlatAPI } from "platapi";
 
 ${configFile}
 

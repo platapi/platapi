@@ -25,9 +25,13 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
     const serverFile = `
 import { PlatAPI } from "platapi";
 
-${configFile}
+let ___apiConfig;
 
-const ___apiConfig = module.exports;
+(() => {
+    const module = {};
+    ${configFile}
+    ___apiConfig = module.exports;
+})();
 
 if(!___apiConfig.routes)
 {
@@ -61,12 +65,13 @@ module.exports.handler = new PlatAPI(___apiConfig).handler;
         input: cacheDir + "/server.ts",
         output: output,
         plugins: [
+            commonjs(),
             resolve({
                 browser: false,
-                preferBuiltins: true
+                preferBuiltins: true,
+                exportConditions: ["node"]
             }),
             json(),
-            commonjs(),
             typescript({
                 sourceMap: generateSourcemaps,
                 compilerOptions: {
@@ -77,7 +82,9 @@ module.exports.handler = new PlatAPI(___apiConfig).handler;
                 }
             }),
             optimizeLodashImports(),
-            terser()
+            terser({
+                mangle: false
+            })
         ]
     });
 

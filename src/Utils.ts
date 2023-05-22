@@ -3,7 +3,7 @@ import functionArguments from "function-arguments";
 import mergeWith from "lodash/mergeWith";
 import path from "path";
 import isArray from "lodash/isArray";
-import { PlatAPIInputParameterRequirement, PlatAPIManagedAPIHandlerConfig, PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "./Types";
+import { PlatAPIInputParameterRequirement, PlatAPIManagedAPIHandlerConfig, PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute, PlatAPIManagedAPIHandler } from "./Types";
 import castArray from "lodash/castArray";
 import fs from "fs";
 import isFunction from "lodash/isFunction";
@@ -14,6 +14,43 @@ const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
+    static generateMethodHandler(theObject: any, httpMethod: string): PlatAPIManagedAPIHandler | undefined {
+        // Is there a key on this object that contains the
+        const handler = theObject[httpMethod.toLowerCase()] ?? theObject[httpMethod.toUpperCase()];
+
+        let handlerConfig: PlatAPIManagedAPIHandlerConfig | undefined;
+        let handlerFunction: Function | undefined;
+
+        if (isArray(handler) && (handler as PlatAPIManagedAPIHandler).length >= 2) {
+            handlerConfig = { ...(handler as PlatAPIManagedAPIHandler)[0] };
+            handlerFunction = (handler as PlatAPIManagedAPIHandler)[1];
+        } else if (theObject.__httpMethods?.[httpMethod.toUpperCase()]) {
+            handlerFunction = theObject[theObject.__httpMethods?.[httpMethod.toUpperCase()]];
+            if (handlerFunction) {
+                handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
+            }
+        } else if (theObject?.prototype.__httpMethods?.[httpMethod.toUpperCase()]) {
+            // This is an instance function which means we need to create an instance of the object
+            const objectInstance = new theObject();
+            handlerFunction = objectInstance[theObject.prototype.__httpMethods[httpMethod.toUpperCase()]];
+
+            // Bind "this" to the object instance
+            //handlerFunction = handlerFunction?.bind(objectInstance); // TODO: this screws with the function parameter names
+
+            if (handlerFunction) {
+                handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
+            }
+        }
+
+        if (handlerFunction) {
+            if (!handlerConfig) {
+                handlerConfig = {};
+            }
+
+            return [handlerConfig, handlerFunction];
+        }
+    }
+
     static getAPIConfig(config?: string | Partial<PlatAPIConfig>): PlatAPIConfigObject {
         let configObject = isString(config) ? undefined : (config as PlatAPIConfigObject | undefined);
 
@@ -63,9 +100,9 @@ export class Utils {
         return results;
     }
 
-    static mergeObjects(...values: any[]) {
+    static mergeObjects(...values: any[]): any {
         // @ts-ignore
-        mergeWith(...values, (objValue, srcValue) => {
+        return mergeWith(...values, (objValue, srcValue) => {
             if (isArray(objValue)) {
                 return objValue.concat(srcValue);
             }
@@ -187,7 +224,8 @@ export class Utils {
         baseSource: string | string[],
         parameterNameIsPartOfPath: boolean = true,
         autoConvert: boolean = true,
-        transformFunction?: (value: any) => any
+        transformFunction?: (value: any) => any,
+        extraConfig?: Partial<PlatAPIManagedAPIHandlerConfig>
     ): (target: Object, propertyKey: string | symbol, parameterIndex: number) => void {
         return (target: Object, propertyKey: string | symbol, parameterIndex: number) => {
             const [handlerFunction, parameterName] = Utils.getHandlerAndParameterName(target, propertyKey, parameterIndex);
@@ -207,6 +245,10 @@ export class Utils {
                     }
                 }
             });
+
+            if (extraConfig) {
+                Utils.setManagedAPIHandlerConfig(handlerFunction, extraConfig);
+            }
         };
     }
 }

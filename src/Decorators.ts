@@ -2,6 +2,7 @@ import { Utils } from "./Utils";
 import castArray from "lodash/castArray";
 import { PlatAPIRequestHandler, PlatAPIInputParameterRequirement, PlatAPIResponseFormatter } from "./Types";
 import { OperationObject } from "openapi3-ts/src/model/openapi31";
+import { SecuritySchemeObject } from "openapi3-ts/dist/model/openapi31";
 
 /**
  * A method decorator for a POST endpoint
@@ -105,9 +106,24 @@ export const AllHeaders = Utils.generateParameterSourceDecorator(["request", "he
 /**
  * A parameter decorator to extract a bearer token from an HTTP request
  */
-export const BearerToken = Utils.generateParameterSourceDecorator(["request", "headers", "authorization"], false, false, token => {
-    return token.replace(/Bearer\s+/i, "");
-});
+export const BearerToken = Utils.generateParameterSourceDecorator(
+    ["request", "headers", "authorization"],
+    false,
+    false,
+    token => {
+        return token.replace(/Bearer\s+/i, "");
+    },
+    {
+        securitySchemes: [
+            {
+                description: "JWT Bearer Token",
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT"
+            }
+        ]
+    }
+);
 
 /**
  * A parameter decorator to return the raw Express.js request

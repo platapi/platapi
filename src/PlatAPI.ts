@@ -28,7 +28,8 @@ import {
     PlatAPIConfigObject,
     PlatAPIConfig,
     PlatAPIRoute,
-    PlatAPIFriendlyError
+    PlatAPIFriendlyError,
+    PlatAPIStandardResponseFailure
 } from "./Types";
 
 interface ExtendedRoute extends PlatAPIRoute {
@@ -55,9 +56,12 @@ export class PlatAPI {
 
         // Create our contextual logger
         this.app.use((req, res, next) => {
+            res.locals.requestID = nanoid();
+
             const context = {
                 method: req.method,
-                url: req.url
+                url: req.url,
+                requestID: res.locals.requestID
             };
 
             if (this.config.logContextHandler) {
@@ -69,8 +73,6 @@ export class PlatAPI {
 
             res.once("finish", () => {
                 requestLogger.debug({ statusCode: res.statusCode });
-
-                //log.debug(req.method, req.url, res.statusCode);
 
                 // Clean the logger up after the request
                 const loggers = log.getLoggers();
@@ -131,7 +133,7 @@ export class PlatAPI {
                     return;
                 }
 
-                const handler = PlatAPI._getManagedHandler(module, req.method);
+                const handler = Utils.generateMethodHandler(module, req.method);
                 if (!handler) {
                     next(PlatAPI.createNotFoundError());
                     return;
@@ -159,12 +161,17 @@ export class PlatAPI {
                 res.locals.logger.error(statusCode, err.message, err.stack);
 
                 // Send a friendly response back to the user
-                this._sendResponse(res, message, statusCode);
+                this._sendResponse(req, res, message, statusCode);
             } else {
                 next();
             }
         };
         this.app.use(errorHandler);
+
+        // Our 404 handler
+        this.app.use((req, res, next) => {
+            this._sendResponse(req, res, "Not Found", 404);
+        });
 
         if (isLambda) {
             const serverless = require("serverless-http");
@@ -212,43 +219,6 @@ export class PlatAPI {
         throw PlatAPI.createAPIFriendlyError(friendlyMessage, statusCode, rawError);
     }
 
-    private static _getManagedHandler(theObject: any, httpMethod: string): PlatAPIManagedAPIHandler | undefined {
-        // Is there a key on this object that contains the
-        const handler = theObject[httpMethod.toLowerCase()] ?? theObject[httpMethod.toUpperCase()];
-
-        let handlerConfig: PlatAPIManagedAPIHandlerConfig | undefined;
-        let handlerFunction: Function | undefined;
-
-        if (isArray(handler) && (handler as PlatAPIManagedAPIHandler).length >= 2) {
-            handlerConfig = { ...(handler as PlatAPIManagedAPIHandler)[0] };
-            handlerFunction = (handler as PlatAPIManagedAPIHandler)[1];
-        } else if (theObject.__httpMethods?.[httpMethod.toUpperCase()]) {
-            handlerFunction = theObject[theObject.__httpMethods?.[httpMethod.toUpperCase()]];
-            if (handlerFunction) {
-                handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
-            }
-        } else if (theObject?.prototype.__httpMethods?.[httpMethod.toUpperCase()]) {
-            // This is an instance function which means we need to create an instance of the object
-            const objectInstance = new theObject();
-            handlerFunction = objectInstance[theObject.prototype.__httpMethods[httpMethod.toUpperCase()]];
-
-            // Bind "this" to the object instance
-            //handlerFunction = handlerFunction?.bind(objectInstance); // TODO: this screws with the function parameter names
-
-            if (handlerFunction) {
-                handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
-            }
-        }
-
-        if (handlerFunction) {
-            if (!handlerConfig) {
-                handlerConfig = {};
-            }
-
-            return [handlerConfig, handlerFunction];
-        }
-    }
-
     private _createContextualLogger(id: string, contextData: any): Logger {
         const newLogger = log.getLogger(id);
         let originalFactory = newLogger.methodFactory;
@@ -270,27 +240,117 @@ export class PlatAPI {
         return newLogger;
     }
 
-    private _defaultResponseFormatter = (response: any, statusCode: number): PlatAPIFriendlyResponseSuccess | PlatAPIFriendlyResponseFailure => {
+    private _defaultResponseFormatter = (
+        response: any,
+        statusCode: number,
+        requestID: string,
+        formatForBrowser: boolean = false
+    ): PlatAPIFriendlyResponseSuccess | PlatAPIFriendlyResponseFailure | PlatAPIStandardResponseFailure | string => {
+        if (formatForBrowser) {
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error: ${statusCode}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+    html, body
+    {
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins',sans-serif;
+    font-size: 24px;
+    color: #363636;
+    }
+    .error-container
+    {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    }
+    .error-box
+    {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    }
+    
+    .error-code
+    {
+    font-weight: 600;
+    font-size: 1.5rem;
+    border-right: #A6A6A6 1px solid;
+    }
+    
+    .error-message
+    {
+    white-space: pre-wrap;
+    }
+    
+    .error-box > div
+    {
+    padding: 1.25rem;
+    }
+    
+    .error-id
+    {
+    text-align: center;
+    font-size: 0.5rem;
+    padding: 1.25rem;
+    opacity: 50%;
+    }
+    </style>
+</head>
+<body>
+<div class="error-container">
+    <div class="error-box">
+        <div class="error-code">${statusCode}</div>
+        <div>
+            <div class="error-message">${JSON.stringify(response, null, 4).replace(/^"|"$/g, "")}</div>
+        </div>
+    </div>
+    <div class="error-id">Error ID: ${requestID}</div>
+</div>
+</body>
+</html>`;
+        }
+
         if (statusCode <= 299) {
-            if (this.config?.returnFriendlyResponses === false) {
-                return response;
+            if (this.config?.returnFriendlyResponses) {
+                return {
+                    this: "succeeded",
+                    with: response
+                };
+            }
+
+            return response;
+        } else {
+            if (this.config?.returnFriendlyResponses) {
+                return {
+                    this: "failed",
+                    with: statusCode,
+                    because: response,
+                    id: requestID
+                };
             }
 
             return {
-                this: "succeeded",
-                with: response
-            };
-        } else {
-            return {
-                this: "failed",
-                with: statusCode,
-                because: response
+                error: {
+                    code: statusCode,
+                    message: response,
+                    id: requestID
+                }
             };
         }
     };
 
-    private _sendResponse(res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
-        const formattedResponse = responseFormatter(response, statusCode);
+    private _sendResponse(req: Request, res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
+        const isBrowser = /Mozilla/i.test(req.get("user-agent") ?? "");
+        const formattedResponse = responseFormatter(response, statusCode, res.locals.requestID, isBrowser);
         res.status(statusCode).send(formattedResponse);
     }
 
@@ -413,7 +473,7 @@ export class PlatAPI {
             }
 
             if (!res.writableEnded) {
-                this._sendResponse(res, result, res.statusCode ?? 200, handlerConfig.responseFormatter);
+                this._sendResponse(req, res, result, res.statusCode ?? 200, handlerConfig.responseFormatter);
             }
         } catch (e: any) {
             next(e);

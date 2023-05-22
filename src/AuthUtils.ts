@@ -197,12 +197,28 @@ export class PlatAPIAuth {
 
 export const UseAPIKeyAuth = (config: APIKeyMiddlewareConfig) => {
     return Utils.generateMethodDecorator({
-        middleware: castArray(PlatAPIAuth.APIKeyMiddleware(config))
+        middleware: castArray(PlatAPIAuth.APIKeyMiddleware(config)),
+        securitySchemes: [
+            {
+                description: "API Key",
+                type: "apiKey",
+                in: "header",
+                name: "X-API-KEY"
+            }
+        ]
     });
 };
 
 export const UseJWTAuth = (config: JWTMiddlewareConfig) => {
     return Utils.generateMethodDecorator({
-        middleware: castArray(PlatAPIAuth.JWTMiddleware(config))
+        middleware: castArray(PlatAPIAuth.JWTMiddleware(config)),
+        securitySchemes: [
+            {
+                description: "JWT Bearer Token",
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT"
+            }
+        ]
     });
 };

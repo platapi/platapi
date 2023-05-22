@@ -2,6 +2,7 @@ import type { Logger, LogLevelDesc } from "loglevel";
 import type { RequestHandler, Request, Response } from "express/ts4.0";
 import type { InfoObject, OperationObject } from "openapi3-ts/src/model/openapi31";
 import type { Express } from "express";
+import { SecuritySchemeObject } from "openapi3-ts/dist/model/openapi31";
 
 export interface PlatAPIConfigObject {
     info: InfoObject;
@@ -61,6 +62,15 @@ export interface PlatAPIFriendlyResponseFailure<T = any> {
     this: "failed";
     with: number;
     because?: T;
+    id: string;
+}
+
+export interface PlatAPIStandardResponseFailure<T = any> {
+    error: {
+        message: string;
+        code: number;
+        id: string;
+    };
 }
 
 export interface PlatAPIInputParameterRequirement {
@@ -76,7 +86,7 @@ export interface PlatAPIInputParameterRequirement {
     transformFunction?: (value: any) => any;
 }
 
-export type PlatAPIResponseFormatter = (outputValue: any, statusCode: number) => any;
+export type PlatAPIResponseFormatter = (outputValue: any, statusCode: number, requestID: string, formatForBrowser?: boolean) => any;
 
 export interface PlatAPIManagedAPIHandlerConfig {
     responseContentType?: string;
@@ -84,6 +94,7 @@ export interface PlatAPIManagedAPIHandlerConfig {
     middleware?: PlatAPIRequestHandler[];
     params?: PlatAPIInputParameterRequirements;
     docs?: Partial<OperationObject>;
+    securitySchemes?: SecuritySchemeObject[];
 }
 
 export type PlatAPIInputParameterRequirements = { [paramName: string]: PlatAPIInputParameterRequirement };

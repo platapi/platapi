@@ -218,25 +218,6 @@ export class DocGenerator {
                             param.in = "header";
                             break;
                         }
-                        case "BearerToken": {
-                            param.in = "header";
-                            param.name = "Authorization";
-                            param.schema = {
-                                type: "string",
-                                pattern: "^Bearer\\s.+$"
-                            };
-                            param.example = `Bearer V1StGXR8_Z5jdHi6B-myT`;
-
-                            if (!endpoint.security) {
-                                endpoint.security = [];
-                            }
-
-                            if (!endpoint.security.some(sec => sec.bearerAuth)) {
-                                endpoint.security.push({ bearerAuth: [] });
-                            }
-
-                            break;
-                        }
                         case "AllCookies":
                         case "AllPath":
                         case "AllQuery":
@@ -283,23 +264,40 @@ export class DocGenerator {
                 }
             }
 
+            // Load the API module and see if there are any docs within decorators
+            const apiModule = require(sourceFile.getFilePath()).default;
+            const methodHandler = Utils.generateMethodHandler(apiModule, httpMethodName);
+            const handlerSettings = methodHandler?.[0];
+
             const returnType = method.getReturnType();
             endpoint.responses = DocGenerator._generateResponseSchema(returnType, apiSpec, schemaProgram, configObject);
 
-            // Does this method have any overriding documentation?
-            const docsDecorator = method.getDecorator("Docs");
-            if (!!docsDecorator) {
-                try {
-                    const apiModule = require(sourceFile.getFilePath()).default;
-                    // @ts-ignore
-                    const [handlerSettings] = PlatAPI._getManagedHandler(apiModule, httpMethodName);
-                    if (handlerSettings.docs) {
-                        endpoint = {
-                            ...endpoint,
-                            ...handlerSettings.docs
-                        };
+            if (handlerSettings) {
+                // Does this method have any overriding documentation?
+                const docsDecorator = method.getDecorator("Docs");
+                if (!!docsDecorator) {
+                    try {
+                        if (handlerSettings.docs) {
+                            Utils.mergeObjects(endpoint, handlerSettings.docs);
+                        }
+                    } catch (e) {}
+                }
+
+                // Does this endpoint have any security schemes?
+                if (handlerSettings.securitySchemes) {
+                    for (let securityScheme of handlerSettings.securitySchemes) {
+                        const authName = `${securityScheme.type}Auth`;
+                        set(apiSpec, ["components", "securitySchemes", authName], securityScheme);
+
+                        if (!endpoint.security) {
+                            endpoint.security = [];
+                        }
+
+                        endpoint.security.push({
+                            [authName]: []
+                        });
                     }
-                } catch (e) {}
+                }
             }
 
             set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);

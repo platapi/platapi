@@ -246,8 +246,18 @@ export class PlatAPI {
         requestID: string,
         formatForBrowser: boolean = false
     ): PlatAPIFriendlyResponseSuccess | PlatAPIFriendlyResponseFailure | PlatAPIStandardResponseFailure | string => {
-        if (formatForBrowser) {
-            return `<!DOCTYPE html>
+        if (statusCode <= 299) {
+            if (this.config?.returnFriendlyResponses) {
+                return {
+                    this: "succeeded",
+                    with: response
+                };
+            }
+
+            return response;
+        } else {
+            if (formatForBrowser) {
+                return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -317,18 +327,8 @@ export class PlatAPI {
 </div>
 </body>
 </html>`;
-        }
-
-        if (statusCode <= 299) {
-            if (this.config?.returnFriendlyResponses) {
-                return {
-                    this: "succeeded",
-                    with: response
-                };
             }
 
-            return response;
-        } else {
             if (this.config?.returnFriendlyResponses) {
                 return {
                     this: "failed",

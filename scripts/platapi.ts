@@ -11,7 +11,7 @@ import { build } from "./build";
 
 const { program } = require("commander");
 
-program.name("a2l").description("PlatAPI command line interface").version("0.1.0");
+program.name("platapi").description("PlatAPI command line interface").version("0.1.0");
 
 program
     .command("dev")
@@ -39,25 +39,20 @@ program
     .option("-c --config <string>", "the location of your api.config.ts or api.config.js file", "./api.config.js")
     .option("-o, --outfile <string>", "output docs to a file, otherwise will print to console.")
     .action(async (options: any) => {
-        const config: PlatAPIConfigObject = Utils.getAPIConfig(options.config);
+        let args = [path.resolve(__dirname, "generate-docs")];
 
-        let docs = await DocGenerator.generateDocs(config);
-
-        if (options.defaultSpecFile) {
-            const defaultSpecFile = await fs.readJson(options.defaultSpecFile);
-            docs = defaultsDeep({}, defaultSpecFile, docs);
+        for (let optionName of Object.keys(options)) {
+            args = [...args, `--${optionName}`, options[optionName]];
         }
 
-        if (options.outfile) {
-            await fs.ensureFile(options.outfile);
-            await fs.writeJSON(options.outfile, docs);
-            return;
-        }
-
-        if (!options.outfile) {
-            console.log(JSON.stringify(docs, null, 4));
-            return;
-        }
+        // We need to use ts-node here so the doc generator can load typescript files
+        const child = spawn("node_modules/.bin/ts-node", args, {
+            stdio: "inherit",
+            env: {
+                ...process.env,
+                API_CONFIG_FILE: options.config
+            }
+        });
     });
 
 program.parse();

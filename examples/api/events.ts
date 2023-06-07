@@ -6,7 +6,5 @@ export default class SampleAPI {
     static async createEvent(
         @Body
         event: Event | Event[]
-    ): Promise<Event | Event[]> {
-        return event;
-    }
+    ): Promise<void> {}
 }

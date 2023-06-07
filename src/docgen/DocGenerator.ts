@@ -342,6 +342,10 @@ export class DocGenerator {
     }
 
     private static _generateAPISchema(type: Type | string, apiSpec: OpenAPIObject, program: TJS.Program, defaultValue?: any): SchemaObject | undefined {
+        if (!isString(type) && DocGenerator._isNilType(type)) {
+            return;
+        }
+
         const parameterTypeName = isString(type) ? (type as string) : DocGenerator._generateTypeDefinitionName(type);
 
         try {
@@ -381,7 +385,7 @@ export class DocGenerator {
                 return restOfSchema as SchemaObject;
             }
         } catch (e) {
-            console.error("_generateAPISchema", e);
+            // An error is reasonable here
         }
     }
 

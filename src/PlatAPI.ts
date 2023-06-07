@@ -349,7 +349,7 @@ export class PlatAPI {
     };
 
     private _sendResponse(req: Request, res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
-        const isBrowser = /Mozilla/i.test(req.get("user-agent") ?? "");
+        const isBrowser = req.get("sec-fetch-mode") === "navigate";
         const formattedResponse = responseFormatter(response, statusCode, res.locals.requestID, isBrowser);
         res.status(statusCode).send(formattedResponse);
     }

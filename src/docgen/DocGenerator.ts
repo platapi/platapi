@@ -6,7 +6,6 @@ import * as TJS from "typescript-json-schema";
 import crypto from "crypto";
 import fs from "fs";
 import os from "os";
-import { PlatAPI } from "../PlatAPI";
 import defaultsDeep from "lodash/defaultsDeep";
 import isString from "lodash/isString";
 import set from "lodash/set";

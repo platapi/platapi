@@ -71,7 +71,7 @@ export class DocGenerator {
             let partialBodyTypes: { name: string; type: string; optional: boolean }[] = [];
 
             for (let parameter of method.getParameters()) {
-                const isPartialBodyParam = !!parameter.getDecorator("Body");
+                const isPartialBodyParam = !!parameter.getDecorator("BodyPart");
                 const isOptional = !!parameter.getDecorator("Optional") || parameter.isOptional();
                 const parameterType = parameter.getType();
                 const parameterTypeDef = DocGenerator._generateTypeDefinition(parameterType);
@@ -381,7 +381,7 @@ export class DocGenerator {
                 return restOfSchema as SchemaObject;
             }
         } catch (e) {
-            //console.error("_generateAPISchema", e);
+            console.error("_generateAPISchema", e);
         }
     }
 

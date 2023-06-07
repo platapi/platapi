@@ -1,7 +1,7 @@
 import path from "path";
 import { ClassDeclaration, MethodDeclaration, Project, SourceFile, SyntaxKind, Type } from "ts-morph";
 import { OpenAPIObject } from "openapi3-ts/oas31";
-import { OperationObject, ParameterObject, ResponsesObject, SchemaObject } from "openapi3-ts/src/model/openapi31";
+import { ContentObject, OperationObject, ParameterObject, ResponsesObject, SchemaObject } from "openapi3-ts/src/model/openapi31";
 import * as TJS from "typescript-json-schema";
 import crypto from "crypto";
 import fs from "fs";
@@ -12,6 +12,7 @@ import isString from "lodash/isString";
 import set from "lodash/set";
 import { Utils } from "../Utils";
 import { PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "../Types";
+import { Docs } from "../Decorators";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
 
@@ -249,19 +250,9 @@ export class DocGenerator {
             );
 
             if (requestBodySchema) {
-                switch (requestBodySchema.type) {
-                    case "object":
-                    case "array": {
-                        endpoint.requestBody = {
-                            content: {
-                                "application/json": {
-                                    schema: requestBodySchema
-                                }
-                            }
-                        };
-                        break;
-                    }
-                }
+                endpoint.requestBody = {
+                    content: DocGenerator._generateMimeTypeSchema(requestBodySchema)
+                };
             }
 
             // Load the API module and see if there are any docs within decorators
@@ -306,6 +297,27 @@ export class DocGenerator {
         return apiSpec;
     }
 
+    private static _generateMimeTypeSchema(schema: SchemaObject): ContentObject {
+        switch (schema.type) {
+            case "string":
+            case "boolean":
+            case "number": {
+                return {
+                    "text/plain": {
+                        schema: schema
+                    }
+                };
+            }
+            default: {
+                return {
+                    "application/json": {
+                        schema: schema
+                    }
+                };
+            }
+        }
+    }
+
     private static _generateResponseSchema(type: Type, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfigObject): ResponsesObject {
         const responses: ResponsesObject = {};
 
@@ -317,23 +329,13 @@ export class DocGenerator {
                     properties: {
                         with: returnTypeSchema
                     }
-                }) as any;
+                }) as SchemaObject;
             }
 
-            switch (returnTypeSchema?.type) {
-                case "object":
-                case "array": {
-                    responses["200"] = {
-                        description: "Successful Response",
-                        content: {
-                            "application/json": {
-                                schema: returnTypeSchema
-                            }
-                        }
-                    };
-                    break;
-                }
-            }
+            responses["200"] = {
+                description: "Successful Response",
+                content: DocGenerator._generateMimeTypeSchema(returnTypeSchema)
+            };
         }
 
         return responses;
@@ -391,11 +393,41 @@ export class DocGenerator {
         return returnSchema;
     }
 
-    private static _toSentenceCase(inputString: string): string {
-        // Replace capital letters with a space and the lowercase version of the same letter
-        const result = inputString.replace(/([A-Z0-9])/g, " $1").toLowerCase();
-        // Capitalize the first letter of the first word
-        return result.charAt(0).toUpperCase() + result.slice(1);
+    private static _toSentenceCase(camelCaseWord: string): string {
+        function capitalizeWord(word: string) {
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }
+
+        function separateCommonSingleLetters(word: string) {
+            // Check if the word is a common single letter
+            const commonSingleLetters = ["a", "i"];
+            const separatedWord = word.replace(/([a-z])([A-Z])/g, function (match, p1, p2) {
+                if (commonSingleLetters.includes(p2.toLowerCase())) {
+                    return p1 + " " + p2;
+                }
+                return match;
+            });
+            return separatedWord;
+        }
+
+        // Split the camel case word into an array of words
+        const words = camelCaseWord.replace(/([a-z])([A-Z])/g, "$1 $2").split(" ");
+
+        // Convert each word to lowercase and capitalize only the first word
+        const sentence = words
+            .map((word, index) => {
+                if (index === 0) {
+                    // Capitalize the first word
+                    return capitalizeWord(word);
+                } else {
+                    // Separate common single letters and convert the rest of the word to lowercase
+                    const separatedWord = separateCommonSingleLetters(word);
+                    return separatedWord.toLowerCase();
+                }
+            })
+            .join(" ");
+
+        return sentence;
     }
 
     private static _forEachEndpoint(routes: PlatAPIRoute[], predicate: (route: PlatAPIRoute, method: MethodDeclaration, httpMethodName: string, sourceFile: SourceFile) => void) {

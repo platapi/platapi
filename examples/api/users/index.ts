@@ -5,8 +5,8 @@ export default class SampleAPI {
     @POST
     static async createUser(
         @Body
-        user: User
-    ): Promise<User> {
+        user: User | string
+    ): Promise<User | string> {
         return user;
     }
 }

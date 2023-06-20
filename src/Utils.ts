@@ -167,6 +167,7 @@ export class Utils {
             const files = Utils.walkFileTree(rootDirectory);
 
             return files
+                .filter(filename => /.ts$|.js$/.test(filename))
                 .map(filename => {
                     let expressRoute = Utils.nextRouteToExpressRoute(filename.replace(rootDirectory, ""));
                     return {

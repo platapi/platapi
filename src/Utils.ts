@@ -134,9 +134,9 @@ export class Utils {
                 .replace(/\.[^/.]+$/, "") // Remove file extensions
                 .replace(/\[([^/]+)]/g, (fullMatch, paramName) => {
                     if (OPTIONAL_CATCH_ALL_REGEX.test(paramName)) {
-                        return paramName.replace(OPTIONAL_CATCH_ALL_REGEX, ":$1([\\w/]{0,})?");
+                        return paramName.replace(OPTIONAL_CATCH_ALL_REGEX, `:$1([\\\\w/]+)?`);
                     } else if (CATCH_ALL_REGEX.test(paramName)) {
-                        return paramName.replace(CATCH_ALL_REGEX, ":$1([\\w/]+)");
+                        return paramName.replace(CATCH_ALL_REGEX, `:$1([\\\\w/]+)`);
                     }
 
                     return `:${paramName}`;

@@ -7,7 +7,7 @@ export default class SampleAPI {
         eventType: string,
         @Body
         event: any
-    ): Promise<void> {
-        return event;
+    ): Promise<string> {
+        return eventType;
     }
 }

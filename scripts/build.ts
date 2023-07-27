@@ -73,6 +73,7 @@ module.exports.handler = new PlatAPI(___apiConfig).handler;
             }),
             json(),
             typescript({
+                noEmitOnError: true,
                 sourceMap: generateSourcemaps,
                 compilerOptions: {
                     module: "esnext",

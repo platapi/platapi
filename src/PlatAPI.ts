@@ -12,7 +12,6 @@ import { nanoid } from "nanoid";
 import get from "lodash/get";
 import has from "lodash/has";
 import isNil from "lodash/isNil";
-import isArray from "lodash/isArray";
 import { Utils } from "./Utils";
 import { ErrorRequestHandler } from "express-serve-static-core";
 import cors from "cors";
@@ -23,7 +22,6 @@ import {
     PlatAPIFriendlyResponseSuccess,
     PlatAPIInputParameterRequirements,
     PlatAPIManagedAPIHandler,
-    PlatAPIManagedAPIHandlerConfig,
     PlatAPIResponseFormatter,
     PlatAPIConfigObject,
     PlatAPIConfig,
@@ -31,6 +29,7 @@ import {
     PlatAPIFriendlyError,
     PlatAPIStandardResponseFailure
 } from "./Types";
+import { PlatAPILogger } from "./PlatAPILogger";
 
 interface ExtendedRoute extends PlatAPIRoute {
     import?: () => Promise<any>;
@@ -41,16 +40,14 @@ export class PlatAPI {
     readonly app?: Express;
     readonly server?: Server;
     readonly config: PlatAPIConfigObject;
-    static readonly logger = log;
+    static readonly logger = PlatAPILogger;
 
     constructor(config?: PlatAPIConfig) {
         this.config = Utils.getAPIConfig(config);
 
-        log.setLevel((process.env.LOG_LEVEL as any) ?? "error");
-
         const packageInfo = require("../package.json");
 
-        log.info(packageInfo.name, packageInfo.version);
+        PlatAPI.logger.info(packageInfo.name, packageInfo.version);
 
         this.app = this.config.app ?? express();
 
@@ -109,11 +106,11 @@ export class PlatAPI {
 
         // If routes aren't directly specified, then we can use file-system routing
         if (!apiRoutes) {
-            log.info("Loading API routes from", this.config.apiRootDirectory);
+            PlatAPI.logger.info("Loading API routes from", this.config.apiRootDirectory);
             apiRoutes = Utils.generateAPIRoutesFromFiles(this.config.apiRootDirectory as string);
 
             if (apiRoutes.length === 0) {
-                log.warn("No API routes found at", this.config.apiRootDirectory);
+                PlatAPI.logger.warn("No API routes found at", this.config.apiRootDirectory);
             }
         }
 
@@ -150,18 +147,11 @@ export class PlatAPI {
         // Our main route handler
         this.app.use("/", apiRouter);
 
-        // Our default uncaught error handler
+        // This is where we catch any uncaught errors
         const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
             // I don't think err is never missing, but do this just in case
             if (err) {
-                const statusCode = err.statusCode ?? 500;
-                const message = err.friendlyMessage ?? "unknown";
-
-                // Log our raw error
-                res.locals.logger.error(statusCode, err.message, err.stack);
-
-                // Send a friendly response back to the user
-                this._sendResponse(req, res, message, statusCode);
+                this._sendErrorResponse(req, res, err, true);
             } else {
                 next();
             }
@@ -170,7 +160,7 @@ export class PlatAPI {
 
         // Our 404 handler
         this.app.use((req, res, next) => {
-            this._sendResponse(req, res, "Not Found", 404);
+            this._sendErrorResponse(req, res, PlatAPI.createNotFoundError());
         });
 
         if (isLambda) {
@@ -184,7 +174,7 @@ export class PlatAPI {
             this.handler = serverless(this.app, serverlessOptions);
         } else {
             this.server = this.app.listen(this.config.apiPort);
-            log.info(`API Started on port`, this.config.apiPort);
+            PlatAPI.logger.info(`API Started on port`, this.config.apiPort);
         }
     }
 
@@ -225,7 +215,12 @@ export class PlatAPI {
         newLogger.methodFactory = (methodName, logLevel, loggerName) => {
             let rawMethod = originalFactory(methodName, logLevel, loggerName);
             return function () {
-                const argData = Array.from(arguments);
+                let argData = Array.from(arguments);
+
+                if (argData.length === 1) {
+                    argData = argData[0];
+                }
+
                 rawMethod(
                     JSON.stringify({
                         time: new Date().toISOString(),
@@ -236,7 +231,7 @@ export class PlatAPI {
                 );
             };
         };
-        newLogger.setLevel(newLogger.getLevel());
+        newLogger.setLevel(PlatAPI.logger.getLevel());
         return newLogger;
     }
 
@@ -347,6 +342,18 @@ export class PlatAPI {
             };
         }
     };
+
+    private _sendErrorResponse(req: Request, res: Response, error: Error | PlatAPIFriendlyError, log2Console: boolean = false) {
+        const statusCode = (error as PlatAPIFriendlyError).statusCode ?? 500;
+        const message = (error as PlatAPIFriendlyError).friendlyMessage ?? "unknown";
+
+        if (log2Console) {
+            res.locals.logger.error({ statusCode: statusCode, name: error.name, message: error.message, stack: error.stack });
+        }
+
+        // Send a friendly response back to the user
+        this._sendResponse(req, res, message, statusCode);
+    }
 
     private _sendResponse(req: Request, res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
         const isBrowser = req.get("sec-fetch-mode") === "navigate";

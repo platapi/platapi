@@ -6,5 +6,7 @@ export default class SampleAPI {
     static async createEvent(
         @Body
         event: Event | Event[]
-    ): Promise<void> {}
+    ): Promise<void> {
+        throw new Error("something bad!");
+    }
 }

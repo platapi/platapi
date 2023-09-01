@@ -14,6 +14,14 @@ const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
+    static replaceHandlebarAttributesInText(text: string, attributes: { [attributeName: string]: any }): string {
+        return Utils.replaceHandlebarsInText(text, (wholeMatch, attributeName) => (attributeName in attributes ? attributes[attributeName] : ""));
+    }
+
+    static replaceHandlebarsInText(text: string, replacerFunction: (wholeMatch: string, attributeName: string) => string) {
+        return text.replace(/\{\{([^}]+?)\}\}/g, replacerFunction);
+    }
+
     static generateMethodHandler(theObject: any, httpMethod: string): PlatAPIManagedAPIHandler | undefined {
         // Is there a key on this object that contains the
         const handler = theObject[httpMethod.toLowerCase()] ?? theObject[httpMethod.toUpperCase()];
@@ -227,7 +235,7 @@ export class Utils {
         autoConvert: boolean = true,
         transformFunction?: (value: any) => any,
         extraConfig?: Partial<PlatAPIManagedAPIHandlerConfig>
-    ): (target: Object, propertyKey: string | symbol, parameterIndex: number) => void {
+    ) {
         return (target: Object, propertyKey: string | symbol, parameterIndex: number) => {
             const [handlerFunction, parameterName] = Utils.getHandlerAndParameterName(target, propertyKey, parameterIndex);
 

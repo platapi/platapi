@@ -1,12 +1,12 @@
-import { BearerToken, GET, Logger, PlatAPILogger } from "../../../../src";
+import { BearerToken, GET, AllHeaders, Logger, PlatAPILogger, Request, Header } from "../../../../src";
 import { User } from "../../../src/User";
 
 export default class SampleAPI {
     @GET
     static async getUserByID(
         userID: string,
-        @BearerToken
-        accessToken: string
+        @Header
+        blah: any
     ): Promise<User> {
         return {
             id: userID,

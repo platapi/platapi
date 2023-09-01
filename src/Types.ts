@@ -49,6 +49,11 @@ export interface PlatAPIConfigObject {
     returnFriendlyResponses?: boolean;
 
     binaryMediaTypes?: string[];
+
+    /**
+     * An HTML template to use to return nicely formatted API error messages when the user-agent looks like a browser
+     */
+    browserHTMLErrorTemplate?: string;
 }
 
 export type PlatAPIConfig = Partial<PlatAPIConfigObject> | string;

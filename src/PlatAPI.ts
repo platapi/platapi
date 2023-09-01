@@ -10,7 +10,6 @@ import { Express, Request, Response, NextFunction } from "express/ts4.0";
 import log, { Logger } from "loglevel";
 import { nanoid } from "nanoid";
 import get from "lodash/get";
-import has from "lodash/has";
 import isNil from "lodash/isNil";
 import { Utils } from "./Utils";
 import { ErrorRequestHandler } from "express-serve-static-core";
@@ -30,6 +29,7 @@ import {
     PlatAPIStandardResponseFailure
 } from "./Types";
 import { PlatAPILogger } from "./PlatAPILogger";
+import { DefaultBrowserErrorTemplate } from "./DefaultBrowserErrorTemplate";
 
 interface ExtendedRoute extends PlatAPIRoute {
     import?: () => Promise<any>;
@@ -252,76 +252,11 @@ export class PlatAPI {
             return response;
         } else {
             if (formatForBrowser) {
-                return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Error: ${statusCode}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-    html, body
-    {
-    margin: 0;
-    padding: 0;
-    font-family: 'Poppins',sans-serif;
-    font-size: 24px;
-    color: #363636;
-    }
-    .error-container
-    {
-    min-height: 100vh;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    }
-    .error-box
-    {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    }
-    
-    .error-code
-    {
-    font-weight: 600;
-    font-size: 1.5rem;
-    border-right: #A6A6A6 1px solid;
-    }
-    
-    .error-message
-    {
-    white-space: pre-wrap;
-    }
-    
-    .error-box > div
-    {
-    padding: 1.25rem;
-    }
-    
-    .error-id
-    {
-    text-align: center;
-    font-size: 0.5rem;
-    padding: 1.25rem;
-    opacity: 50%;
-    }
-    </style>
-</head>
-<body>
-<div class="error-container">
-    <div class="error-box">
-        <div class="error-code">${statusCode}</div>
-        <div>
-            <div class="error-message">${JSON.stringify(response, null, 4).replace(/^"|"$/g, "")}</div>
-        </div>
-    </div>
-    <div class="error-id">Error ID: ${requestID}</div>
-</div>
-</body>
-</html>`;
+                return Utils.replaceHandlebarAttributesInText(this.config.browserHTMLErrorTemplate ?? DefaultBrowserErrorTemplate, {
+                    statusCode: statusCode,
+                    errorMessage: JSON.stringify(response, null, 4).replace(/^"|"$/g, ""),
+                    requestID: requestID
+                });
             }
 
             if (this.config?.returnFriendlyResponses) {
@@ -373,11 +308,7 @@ export class PlatAPI {
             let paramValue;
 
             const inputSource = {
-                request: {
-                    ...req,
-                    // Make a copy of the headers so we get by path
-                    headers: { ...req.headers }
-                },
+                request: req,
                 response: res
             };
 
@@ -387,7 +318,7 @@ export class PlatAPI {
                 ["request", "body", paramName]
             ];
 
-            const foundPath = inputSourcePaths.find(path => has(inputSource, path));
+            const foundPath = inputSourcePaths.find(path => get(inputSource, path) !== undefined);
 
             if (foundPath) {
                 paramValue = get(inputSource, foundPath);

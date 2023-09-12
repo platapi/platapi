@@ -9,11 +9,24 @@ import fs from "fs";
 import isFunction from "lodash/isFunction";
 import isString from "lodash/isString";
 import defaults from "lodash/defaults";
+import { Request } from "express/ts4.0";
 
 const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
+    static isBrowserRequest(request: Request): boolean {
+        if (request.get("sec-fetch-mode")?.toLowerCase() === "navigate") {
+            return true;
+        }
+
+        if (request.get("user-agent")?.toLowerCase().includes("mozilla")) {
+            return true;
+        }
+
+        return false;
+    }
+
     static replaceHandlebarAttributesInText(text: string, attributes: { [attributeName: string]: any }): string {
         return Utils.replaceHandlebarsInText(text, (wholeMatch, attributeName) => (attributeName in attributes ? attributes[attributeName] : ""));
     }

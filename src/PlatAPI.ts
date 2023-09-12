@@ -291,8 +291,7 @@ export class PlatAPI {
     }
 
     private _sendResponse(req: Request, res: Response, response: any, statusCode: number = 200, responseFormatter: PlatAPIResponseFormatter = this._defaultResponseFormatter) {
-        const isBrowser = req.get("sec-fetch-mode") === "navigate";
-        const formattedResponse = responseFormatter(response, statusCode, res.locals.requestID, isBrowser);
+        const formattedResponse = responseFormatter(response, statusCode, res.locals.requestID, Utils.isBrowserRequest(req));
         res.status(statusCode).send(formattedResponse);
     }
 

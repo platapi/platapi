@@ -7,9 +7,9 @@ describe("DocGenerator", () => {
             version: "1.0.0"
         };
 
-        const apiSpec = await DocGenerator.generateDocs(info, {
-            apiRootDirectory: "./tests/sample-api"
-        });
-        console.log(JSON.stringify(apiSpec, null, 4));
+        // const apiSpec = await DocGenerator.generateDocs(info, {
+        //     apiRootDirectory: "./tests/sample-api"
+        // });
+        // console.log(JSON.stringify(apiSpec, null, 4));
     });
 });

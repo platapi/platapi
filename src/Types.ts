@@ -100,6 +100,10 @@ export interface PlatAPIManagedAPIHandlerConfig {
     params?: PlatAPIInputParameterRequirements;
     docs?: Partial<OperationObject>;
     securitySchemes?: SecuritySchemeObject[];
+    requestValidator?: {
+        runBeforeMiddleware?: boolean;
+        handler: PlatAPIRequestHandler;
+    };
 }
 
 export type PlatAPIInputParameterRequirements = { [paramName: string]: PlatAPIInputParameterRequirement };

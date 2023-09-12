@@ -351,6 +351,10 @@ export class PlatAPI {
             let result;
             let [handlerConfig, handlerFunction] = handler;
 
+            if (handlerConfig.requestValidator?.handler && handlerConfig.requestValidator.runBeforeMiddleware) {
+                handlerConfig.requestValidator.handler(req as any, res, next);
+            }
+
             // Do we have any middleware we need to execute first?
             if (handlerConfig.middleware) {
                 for (let middleware of handlerConfig.middleware) {
@@ -383,6 +387,10 @@ export class PlatAPI {
                         return;
                     }
                 }
+            }
+
+            if (handlerConfig.requestValidator?.handler && !handlerConfig.requestValidator.runBeforeMiddleware) {
+                handlerConfig.requestValidator.handler(req as any, res, next);
             }
 
             const handlerArgNames = Utils.getFunctionParamNames(handlerFunction);

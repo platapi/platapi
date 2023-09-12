@@ -131,6 +131,21 @@ export const BearerToken = Utils.generateParameterSourceDecorator(
 export const Request = Utils.generateParameterSourceDecorator("request", false);
 
 /**
+ * A method decorator to validate an API request. This is basically an express middleware function that can run before or after any other middleware.
+ * @param validator
+ * @param runBeforeMiddleware
+ * @constructor
+ */
+export const ValidateRequest = (validator: PlatAPIRequestHandler, runBeforeMiddleware: boolean = false) => {
+    return Utils.generateMethodDecorator({
+        requestValidator: {
+            runBeforeMiddleware: runBeforeMiddleware,
+            handler: validator
+        }
+    });
+};
+
+/**
  * A parameter decorator to return the raw Express.js response
  */
 export const Response = Utils.generateParameterSourceDecorator("response", false);

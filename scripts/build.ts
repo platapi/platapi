@@ -10,9 +10,6 @@ import path from "path";
 import fs from "fs-extra";
 import { Utils } from "../src/Utils";
 
-const requireJSON5 = require("require-json5");
-const tsConfig = requireJSON5(path.join(process.cwd(), "tsconfig.json"));
-
 export async function build(configFilePath: string, generateSourcemaps: boolean = false) {
     const apiConfig = Utils.getAPIConfig(configFilePath);
     const buildDir = path.resolve(process.cwd(), "build");
@@ -79,7 +76,6 @@ module.exports.handler = new PlatAPI(___apiConfig).handler;
                 noEmitOnError: true,
                 sourceMap: generateSourcemaps,
                 compilerOptions: {
-                    ...(tsConfig.compilerOptions ?? {}),
                     module: "esnext",
                     target: "es2020",
                     outDir: undefined,

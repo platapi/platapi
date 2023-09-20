@@ -1,4 +1,4 @@
-import { Body, Optional, Path, POST } from "../../../../src";
+import { Body, Optional, Path, POST } from "../../../../../src";
 
 export default class SampleAPI {
     @POST

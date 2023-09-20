@@ -42,7 +42,7 @@ if(!___apiConfig.routes)
         .map(
             route => `
 ___apiConfig.routes.push({
-    endpoint: "${route.endpoint.replace(/\\w/g, "\\\\w")}",
+    endpoint: "${route.endpoint.replace(/\\/g, "\\\\")}",
     import: () => import("${route.file!.replace(/.ts$/, "")}")
 });
     `

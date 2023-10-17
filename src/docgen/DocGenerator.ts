@@ -104,7 +104,9 @@ export class DocGenerator {
         await fs.promises.writeFile(typeDefFilename, typeDefsString);
 
         const schemaProgram = TJS.getProgramFromFiles([typeDefFilename], {
-            skipLibCheck: true
+            skipLibCheck: true,
+            esModuleInterop: true,
+            allowSyntheticDefaultImports: true
         });
 
         DocGenerator._forEachEndpoint(routes, (route, method, httpMethodName, sourceFile) => {
@@ -350,7 +352,8 @@ export class DocGenerator {
         try {
             let schema = TJS.generateSchema(program, parameterTypeName, {
                 required: true,
-                skipLibCheck: true
+                skipLibCheck: true,
+                esModuleInterop: true
             });
 
             if (schema) {

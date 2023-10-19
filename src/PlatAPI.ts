@@ -172,9 +172,11 @@ export class PlatAPI {
             }
 
             this.handler = serverless(this.app, serverlessOptions);
+        } else if (this.config.testingMode) {
+            PlatAPI.logger.info("PlatAPI testing started");
         } else {
             this.server = this.app.listen(this.config.apiPort);
-            PlatAPI.logger.info(`API Started on port`, this.config.apiPort);
+            PlatAPI.logger.info("PlatAPI started on port", this.config.apiPort);
         }
     }
 

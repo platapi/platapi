@@ -54,6 +54,12 @@ export interface PlatAPIConfigObject {
      * An HTML template to use to return nicely formatted API error messages when the user-agent looks like a browser
      */
     browserHTMLErrorTemplate?: string;
+
+    /**
+     * Set this to true if you are connecting the PlatAPI.app instance to a testing framework like Supertest and don't want to spin up an HTTP listener.
+     * May also use environment variable of PLATAPI_TESTING=true
+     */
+    testingMode?: boolean;
 }
 
 export type PlatAPIConfig = Partial<PlatAPIConfigObject> | string;

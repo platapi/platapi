@@ -98,7 +98,8 @@ export class Utils {
             apiRootDirectory: path.resolve(process.cwd(), process.env.API_ROOT_DIRECTORY ?? "./api"),
             apiPort: Number(process.env.API_PORT ?? 3000),
             returnFriendlyResponses: false,
-            loadStandardMiddleware: true
+            loadStandardMiddleware: true,
+            testingMode: process.env.PLATAPI_TESTING === "true" || process.env.PLATAPI_TESTING === "1"
         };
 
         return defaults({}, configObject, defaultConfig);

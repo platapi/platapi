@@ -12,6 +12,7 @@ import set from "lodash/set";
 import { Utils } from "../Utils";
 import { PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "../Types";
 import { Docs } from "../Decorators";
+import get from "lodash/get";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
 
@@ -92,9 +93,20 @@ export class DocGenerator {
                 typeDefs.add(`export interface _PartialBodyType${DocGenerator._createHash(route.endpoint + method)} {${partialBodyTypeProps}};`);
             }
 
+            // Generate a success response return type
             const returnTypeDef = DocGenerator._generateTypeDefinition(method.getReturnType());
             if (returnTypeDef) {
                 typeDefs.add(returnTypeDef);
+            }
+
+            // Generate any error response types
+            const errorTypes = DocGenerator._getErrorTypesFromMethod(method);
+            for (let errorType of errorTypes) {
+                const errorTypeDef = DocGenerator._generateTypeDefinition(errorType);
+
+                if (errorTypeDef) {
+                    typeDefs.add(errorTypeDef);
+                }
             }
         });
 
@@ -261,8 +273,7 @@ export class DocGenerator {
             const methodHandler = Utils.generateMethodHandler(apiModule, httpMethodName);
             const handlerSettings = methodHandler?.[0];
 
-            const returnType = method.getReturnType();
-            endpoint.responses = DocGenerator._generateResponseSchema(returnType, apiSpec, schemaProgram, configObject);
+            endpoint.responses = DocGenerator._generateResponseSchemaForMethod(method, apiSpec, schemaProgram, configObject);
 
             if (handlerSettings) {
                 // Does this method have any overriding documentation?
@@ -319,10 +330,48 @@ export class DocGenerator {
         }
     }
 
-    private static _generateResponseSchema(type: Type, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfigObject): ResponsesObject {
+    private static _generateStandardErrorResponseSchema(rawErrorCodeSchema: SchemaObject, rawErrorMessage: SchemaObject, config: PlatAPIConfigObject): SchemaObject {
+        if (config.returnFriendlyResponses) {
+            return {
+                properties: {
+                    this: {
+                        type: "string",
+                        enum: ["failed"]
+                    },
+                    with: rawErrorCodeSchema,
+                    because: rawErrorMessage,
+                    id: {
+                        type: "string"
+                    }
+                },
+                required: ["this", "with", "because", "id"]
+            };
+        } else {
+            return {
+                properties: {
+                    error: {
+                        type: "object",
+                        properties: {
+                            message: rawErrorMessage,
+                            code: rawErrorCodeSchema,
+                            id: {
+                                type: "string"
+                            }
+                        },
+                        required: ["message", "code", "id"]
+                    }
+                },
+                required: ["error"]
+            };
+        }
+    }
+
+    private static _generateResponseSchemaForMethod(method: MethodDeclaration, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfigObject): ResponsesObject {
         const responses: ResponsesObject = {};
 
-        let returnTypeSchema = DocGenerator._generateAPISchema(type, apiSpec, program);
+        // Generate our return type first
+        const returnType = method.getReturnType();
+        let returnTypeSchema = DocGenerator._generateAPISchema(returnType, apiSpec, program);
 
         if (returnTypeSchema) {
             if (config.returnFriendlyResponses) {
@@ -334,12 +383,81 @@ export class DocGenerator {
             }
 
             responses["200"] = {
-                description: "Successful Response",
+                description: "200 Success",
                 content: DocGenerator._generateMimeTypeSchema(returnTypeSchema)
             };
         }
 
+        // Generate our error types next
+        const errorTypes = DocGenerator._getErrorTypesFromMethod(method);
+
+        for (let errorType of errorTypes) {
+            let rawErrorSchema = DocGenerator._generateAPISchema(errorType, apiSpec, program);
+
+            if (!rawErrorSchema) {
+                continue;
+            }
+
+            const errorCodeSchema: SchemaObject = get(rawErrorSchema, "properties.statusCode") ?? {
+                type: "number",
+                enum: [500]
+            };
+            const errorMessageSchema: SchemaObject = get(rawErrorSchema, "properties.friendlyMessage") ?? {
+                type: "string",
+                enum: ["unknown"]
+            };
+            const errorCode = get(errorCodeSchema, "enum[0]", 500);
+
+            let returnErrorSchema = DocGenerator._generateStandardErrorResponseSchema(errorCodeSchema, errorMessageSchema, config);
+
+            responses[errorCode.toString()] = {
+                description: `${errorCode.toString()} Error`,
+                content: DocGenerator._generateMimeTypeSchema(returnErrorSchema)
+            };
+        }
+
+        // If we don't have a standard 500 response, add a default one here
+        // if (!("500" in responses)) {
+        //     const default500Schema = DocGenerator._generateStandardErrorResponseSchema({
+        //         type: "number",
+        //         enum: [500]
+        //     }, {
+        //         type: "string",
+        //         enum: ["unknown"]
+        //     }, config);
+        //
+        //     responses["500"] = {
+        //         description: "Unknown Error",
+        //         content: DocGenerator._generateMimeTypeSchema(default500Schema)
+        //     };
+        // }
+
         return responses;
+    }
+
+    private static _getErrorTypesFromMethod(method: MethodDeclaration): Type[] {
+        const types: Type[] = [];
+        const methodDecorators = method.getDecorators();
+
+        for (let methodDecorator of methodDecorators) {
+            if (methodDecorator.getName() !== "ErrorReturn") {
+                continue;
+            }
+
+            const errorTypeArg = methodDecorator.getTypeArguments()[0];
+
+            if (!errorTypeArg) {
+                continue;
+            }
+
+            const errorType = errorTypeArg.getType();
+
+            if (errorType) {
+                types.push(errorType);
+            }
+        }
+
+        return types;
     }
 
     private static _generateAPISchema(type: Type | string, apiSpec: OpenAPIObject, program: TJS.Program, defaultValue?: any): SchemaObject | undefined {
@@ -387,7 +505,7 @@ export class DocGenerator {
                 return restOfSchema as SchemaObject;
             }
         } catch (e) {
-            // An error is reasonable here
+            // An error is reasonable to expect here sometimes
         }
     }
 

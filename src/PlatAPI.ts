@@ -180,7 +180,11 @@ export class PlatAPI {
         }
     }
 
-    static createAPIFriendlyError(friendlyMessage?: string, statusCode: number = 500, rawError?: Error): PlatAPIFriendlyError {
+    static createAPIFriendlyError<S extends number = number, M extends string = string>(
+        friendlyMessage?: M,
+        statusCode: S = 500 as S,
+        rawError?: Error
+    ): PlatAPIFriendlyError<S, M> {
         const friendlyError: PlatAPIFriendlyError = (rawError ?? new Error(friendlyMessage ?? "unknown")) as any;
 
         if (friendlyMessage) {
@@ -188,14 +192,14 @@ export class PlatAPI {
         }
         friendlyError.statusCode = statusCode;
         friendlyError.id = nanoid();
-        return friendlyError;
+        return friendlyError as any;
     }
 
-    static createNotFoundError(): PlatAPIFriendlyError {
+    static createNotFoundError() {
         return PlatAPI.createAPIFriendlyError("Not found", 404);
     }
 
-    static createUnauthorizedError(rawError?: Error): PlatAPIFriendlyError {
+    static createUnauthorizedError(rawError?: Error) {
         return PlatAPI.createAPIFriendlyError("Unauthorized", 401, rawError);
     }
 

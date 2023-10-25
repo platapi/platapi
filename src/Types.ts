@@ -1,5 +1,5 @@
 import type { Logger, LogLevelDesc } from "loglevel";
-import type { RequestHandler, Request, Response } from "express/ts4.0";
+import type { RequestHandler, Request, Response } from "express";
 import type { InfoObject, OperationObject } from "openapi3-ts/src/model/openapi31";
 import type { Express } from "express";
 import { SecuritySchemeObject } from "openapi3-ts/dist/model/openapi31";
@@ -69,17 +69,17 @@ export interface PlatAPIFriendlyResponseSuccess<T = any> {
     with: any;
 }
 
-export interface PlatAPIFriendlyResponseFailure<T = any> {
+export interface PlatAPIFriendlyResponseFailure<C extends number = number, T = any> {
     this: "failed";
-    with: number;
+    with: C;
     because?: T;
     id: string;
 }
 
-export interface PlatAPIStandardResponseFailure<T = any> {
+export interface PlatAPIStandardResponseFailure<C extends number = number, M extends string = string> {
     error: {
-        message: string;
-        code: number;
+        message: M;
+        code: C;
         id: string;
     };
 }
@@ -131,8 +131,8 @@ export interface PlatAPIRoute {
     file: string;
 }
 
-export interface PlatAPIFriendlyError extends Error {
-    statusCode: number;
-    friendlyMessage?: string;
+export interface PlatAPIFriendlyError<S extends number = number, M extends string = string> extends Error {
+    statusCode: S;
+    friendlyMessage?: M;
     id: string;
 }

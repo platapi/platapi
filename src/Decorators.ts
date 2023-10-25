@@ -1,8 +1,9 @@
 import { Utils } from "./Utils";
 import castArray from "lodash/castArray";
-import { PlatAPIRequestHandler, PlatAPIInputParameterRequirement, PlatAPIResponseFormatter } from "./Types";
+import { PlatAPIRequestHandler, PlatAPIInputParameterRequirement, PlatAPIResponseFormatter, PlatAPIFriendlyError } from "./Types";
 import { OperationObject } from "openapi3-ts/src/model/openapi31";
 import { SecuritySchemeObject } from "openapi3-ts/dist/model/openapi31";
+import any = jasmine.any;
 
 /**
  * A method decorator for a POST endpoint
@@ -151,7 +152,7 @@ export const ValidateRequest = (validator: PlatAPIRequestHandler, runBeforeMiddl
 export const Response = Utils.generateParameterSourceDecorator("response", false);
 
 /**
- * A parameter decorator to return a context sensitive
+ * A parameter decorator to return a context sensitive logger
  */
 export const Logger = Utils.generateParameterSourceDecorator(["response", "locals", "logger"], false);
 
@@ -189,3 +190,16 @@ export const Docs = (openAPIDocs: Partial<OperationObject>) => {
         docs: openAPIDocs
     });
 };
+
+/**
+ * Denotes an error that can be returned from this endpoint.
+ * @constructor
+ */
+export const ErrorReturn = <E extends PlatAPIFriendlyError>() => {
+    return <E>(target: any, propertyKey: string, descriptor: PropertyDescriptor) => {};
+};
+
+/**
+ * An alternative spelling to ErrorReturn
+ */
+export const Throws = ErrorReturn;

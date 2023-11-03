@@ -16,6 +16,10 @@ const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
     static isBrowserRequest(request: Request): boolean {
+        if (request.get("x-requested-with")?.toLowerCase() === "xmlhttprequest") {
+            return false;
+        }
+
         if (request.get("sec-fetch-mode")?.toLowerCase() === "navigate") {
             return true;
         }

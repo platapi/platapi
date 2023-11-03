@@ -20,10 +20,6 @@ export class Utils {
             return true;
         }
 
-        if (request.get("user-agent")?.toLowerCase().includes("mozilla")) {
-            return true;
-        }
-
         return false;
     }
 

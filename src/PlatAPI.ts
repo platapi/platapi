@@ -11,6 +11,7 @@ import log, { Logger } from "loglevel";
 import { nanoid } from "nanoid";
 import get from "lodash/get";
 import isNil from "lodash/isNil";
+import isString from "lodash/isString";
 import { Utils } from "./Utils";
 import { ErrorRequestHandler } from "express-serve-static-core";
 import cors from "cors";
@@ -180,15 +181,13 @@ export class PlatAPI {
         }
     }
 
-    static createAPIFriendlyError<S extends number = number, M extends string = string>(
-        friendlyMessage?: M,
-        statusCode: S = 500 as S,
-        rawError?: Error
-    ): PlatAPIFriendlyError<S, M> {
-        const friendlyError: PlatAPIFriendlyError = (rawError ?? new Error(friendlyMessage ?? "unknown")) as any;
+    static createAPIFriendlyError<S extends number = number, M extends any = string>(friendlyMessage?: M, statusCode: S = 500 as S, rawError?: Error): PlatAPIFriendlyError<S, M> {
+        const messageString = friendlyMessage === undefined ? "unknown" : isString(friendlyMessage) ? friendlyMessage : JSON.stringify(friendlyMessage);
+
+        const friendlyError: PlatAPIFriendlyError = (rawError ?? new Error(messageString)) as any;
 
         if (friendlyMessage) {
-            friendlyError.friendlyMessage = friendlyMessage;
+            friendlyError.friendlyMessage = friendlyMessage as any;
         }
         friendlyError.statusCode = statusCode;
         friendlyError.id = nanoid();

@@ -1,6 +1,6 @@
 {
     "name": "platapi",
-    "version": "0.2.11",
+    "version": "0.2.12",
     "description": "The easiest way to create an API to love.",
     "main": "./lib/src/index.js",
     "types": "./lib/src/index.d.ts",

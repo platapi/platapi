@@ -131,7 +131,7 @@ export interface PlatAPIRoute {
     file: string;
 }
 
-export interface PlatAPIFriendlyError<S extends number = number, M extends string = string> extends Error {
+export interface PlatAPIFriendlyError<S extends number = number, M extends any = string> extends Error {
     statusCode: S;
     friendlyMessage?: M;
     id: string;

@@ -76,7 +76,7 @@ export interface PlatAPIFriendlyResponseFailure<C extends number = number, T = a
     id: string;
 }
 
-export interface PlatAPIStandardResponseFailure<C extends number = number, M extends string = string> {
+export interface PlatAPIStandardResponseFailure<C extends number = number, M extends any = string> {
     error: {
         message: M;
         code: C;

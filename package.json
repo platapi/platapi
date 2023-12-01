@@ -1,6 +1,6 @@
 {
     "name": "platapi",
-    "version": "0.2.13",
+    "version": "0.3.0",
     "description": "The easiest way to create an API to love.",
     "main": "./lib/src/index.js",
     "types": "./lib/src/index.d.ts",
@@ -54,6 +54,7 @@
         "wildcard-match": "^5.1.2"
     },
     "devDependencies": {
+        "axios": "^1.6.2",
         "@types/aws-lambda": "^8.10.95",
         "@types/cors": "^2.8.12",
         "@types/express": "^4.17.13",

@@ -10,11 +10,44 @@ import isFunction from "lodash/isFunction";
 import isString from "lodash/isString";
 import defaults from "lodash/defaults";
 import { Request } from "express/ts4.0";
+import util from "util";
 
 const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
 
 export class Utils {
+    static convertErrorToObject(error: any): any {
+        const errorObject: any = {};
+
+        function getCircularReplacer() {
+            const ancestors: any[] = [];
+            return function (key: any, value: any) {
+                if (typeof value !== "object" || value === null) {
+                    return value;
+                }
+                // `this` is the object that value is contained in,
+                // i.e., its direct parent.
+                // @ts-ignore
+                while (ancestors.length > 0 && ancestors.at(-1) !== this) {
+                    ancestors.pop();
+                }
+                if (ancestors.includes(value)) {
+                    return "[Circular]";
+                }
+                ancestors.push(value);
+                return value;
+            };
+        }
+
+        // Error objects to serialize easily— we have to do it this way.
+        Object.getOwnPropertyNames(error).forEach(function (key) {
+            errorObject[key] = (error as any)[key];
+        }, this);
+
+        // Some error objects contain circular references— we need to break this
+        return JSON.parse(JSON.stringify(errorObject, getCircularReplacer()));
+    }
+
     static isBrowserRequest(request: Request): boolean {
         if (request.get("x-requested-with")?.toLowerCase() === "xmlhttprequest") {
             return false;

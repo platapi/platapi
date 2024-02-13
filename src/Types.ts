@@ -55,6 +55,12 @@ export interface PlatAPIConfigObject {
      */
     browserHTMLErrorTemplate?: string;
 
+    /***
+     * Use this function to reformat any Errors thrown by the API before it is logged to the console. Can be useful for stripping out sensitive data.
+     * @param err
+     */
+    errorLoggingFormatter?: (err: any) => any;
+
     /**
      * Set this to true if you are connecting the PlatAPI.app instance to a testing framework like Supertest and don't want to spin up an HTTP listener.
      * May also use environment variable of PLATAPI_TESTING=true

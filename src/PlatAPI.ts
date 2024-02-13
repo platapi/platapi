@@ -288,6 +288,10 @@ export class PlatAPI {
         const message = (error as PlatAPIFriendlyError).friendlyMessage ?? "unknown";
 
         if (log2Console) {
+            if (this.config.errorLoggingFormatter) {
+                error = this.config.errorLoggingFormatter(error);
+            }
+
             res.locals.logger.error({ statusCode: statusCode, error: Utils.convertErrorToObject(error) });
         }
 

@@ -132,7 +132,7 @@ export class Utils {
                     configObject = config();
                 }
             } catch (e) {
-                throw new Error("No PlatAPI api.config.ts or api.config.js file found.");
+                throw new Error("No PlatAPI api.config.js file found.");
             }
         }
 

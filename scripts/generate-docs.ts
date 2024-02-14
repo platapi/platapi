@@ -13,7 +13,7 @@ program
     .description("PlatAPI documentation generator")
     .version("0.1.0")
     .option("-d --defaultSpecFile <string>", "the default OpenAPI 3.1 spec for your API— this will be merged in with the generated documentation")
-    .option("-c --config <string>", "the location of your api.config.ts or api.config.js file", "./api.config.js")
+    .option("-c --config <string>", "the location of your api.config.js file", "./api.config.js")
     .option("-o, --outfile <string>", "output docs to a file, otherwise will print to console.")
     .action(async (options: any) => {
         const config: PlatAPIConfigObject = Utils.getAPIConfig(options.config);

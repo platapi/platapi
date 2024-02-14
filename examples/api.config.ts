@@ -1,12 +1,13 @@
 import { isAxiosError } from "axios";
 
+/** @type {import("platapi").PlatAPIConfigObject} */
 const apiConfig = {
     apiRootDirectory: "./examples/api",
     info: {
         title: "My API",
         version: "1.0.0"
     },
-    errorLoggingFormatter: (err: any) => {
+    errorLoggingFormatter: err => {
         if (isAxiosError(err)) {
             console.log("Axios error!");
         }
@@ -15,4 +16,4 @@ const apiConfig = {
     }
 };
 
-export default apiConfig;
+module.exports = apiConfig;

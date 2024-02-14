@@ -6,9 +6,9 @@
     "types": "./lib/src/index.d.ts",
     "repository": "https://github.com/platapi/platapi",
     "scripts": {
-        "dev": "LOG_LEVEL=debug ts-node ./scripts/platapi dev -c examples/api.config.ts",
-        "generate:docs": "LOG_LEVEL=debug ts-node ./scripts/platapi generate:docs -c examples/api.config.ts",
-        "build:example-api": "LOG_LEVEL=debug ts-node ./scripts/platapi build -c examples/api.config.ts",
+        "dev": "LOG_LEVEL=debug ts-node ./scripts/platapi dev -c examples/api.config.js",
+        "generate:docs": "LOG_LEVEL=debug ts-node ./scripts/platapi generate:docs -c examples/api.config.js",
+        "build:example-api": "LOG_LEVEL=debug ts-node ./scripts/platapi build -c examples/api.config.js",
         "build": "rm -Rf ./lib && tsc -p . && cp package.json ./lib",
         "prepublishOnly": "npm_config_yes=true npx husky-init && yarn husky set .husky/pre-commit \"npx pretty-quick --staged\" && husky install && npm run build",
         "test": "LOG_LEVEL=debug jest",

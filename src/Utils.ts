@@ -110,7 +110,7 @@ export class Utils {
 
         if (!configObject) {
             let configPath = isString(config) ? (config as string) : undefined;
-            configPath = configPath ?? process.env.API_CONFIG_FILE;
+            configPath = configPath ?? process.env.API_CONFIG_FILE ?? "./api.config.js";
 
             try {
                 if (!configPath) {

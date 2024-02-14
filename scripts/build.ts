@@ -23,6 +23,7 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
 
     const serverFile = `
 import { PlatAPI } from "platapi";
+// @ts-ignore
 import ___apiConfig from "${path.resolve(process.cwd(), configFilePath)}";
 
 if(!___apiConfig.routes)

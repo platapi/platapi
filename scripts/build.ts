@@ -5,7 +5,6 @@ import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import terser from "@rollup/plugin-terser";
 import { optimizeLodashImports } from "@optimize-lodash/rollup-plugin";
-
 import path from "path";
 import fs from "fs-extra";
 import { Utils } from "../src/Utils";
@@ -19,19 +18,11 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
     await fs.remove(buildDir);
 
     console.log("Generating server file...");
-    let configFile = (await fs.readFile(configFilePath)).toString();
     const routes = Utils.generateAPIRoutesFromFiles(apiConfig.apiRootDirectory ?? "./api");
 
     const serverFile = `
 import { PlatAPI } from "platapi";
-
-let ___apiConfig;
-
-(() => {
-    const module = {};
-    ${configFile}
-    ___apiConfig = module.exports;
-})();
+import * as __apiConfig from "${path.resolve(buildDir, configFilePath)}";
 
 if(!___apiConfig.routes)
 {

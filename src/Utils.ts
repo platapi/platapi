@@ -110,16 +110,29 @@ export class Utils {
 
         if (!configObject) {
             let configPath = isString(config) ? (config as string) : undefined;
+            configPath = configPath ?? process.env.API_CONFIG_FILE;
 
             try {
-                configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE ?? "api.config.js");
+                if (!configPath) {
+                    // Should be caught below
+                    throw new Error();
+                }
+
+                configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE);
 
                 configObject = require(configPath);
+
+                // @ts-ignore
+                if (configObject.default && configObject.__esModule) {
+                    // @ts-ignore
+                    configObject = configObject.default;
+                }
+
                 if (isFunction(config)) {
                     configObject = config();
                 }
             } catch (e) {
-                // No config file present
+                throw new Error("No PlatAPI api.config.ts or api.config.js file found.");
             }
         }
 

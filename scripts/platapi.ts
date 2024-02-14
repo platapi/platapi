@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 
-import { DocGenerator } from "../src/docgen/DocGenerator";
-import fs from "fs-extra";
-import defaultsDeep from "lodash/defaultsDeep";
 import { spawn } from "child_process";
 import path from "path";
-import { PlatAPIConfigObject } from "../src";
-import { Utils } from "../src/Utils";
 import { build } from "./build";
 
 const { program } = require("commander");
@@ -28,7 +23,7 @@ program
 
 program
     .command("build")
-    .option("-c --config <string>", "the location of your api.config.ts or api.config.js file", "./api.config.js")
+    .option("-c --config <string>", "the location of your api.config.ts or api.config.js file", "./api.config.ts")
     .action(async (options: any) => {
         await build(options.config);
     });

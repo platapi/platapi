@@ -19,19 +19,11 @@ export async function build(configFilePath: string, generateSourcemaps: boolean 
     await fs.remove(buildDir);
 
     console.log("Generating server file...");
-    let configFile = (await fs.readFile(configFilePath)).toString();
     const routes = Utils.generateAPIRoutesFromFiles(apiConfig.apiRootDirectory ?? "./api");
 
     const serverFile = `
 import { PlatAPI } from "platapi";
-
-let ___apiConfig;
-
-(() => {
-    const module = {};
-    ${configFile}
-    ___apiConfig = module.exports;
-})();
+import ___apiConfig from "${path.resolve(process.cwd(), configFilePath)}";
 
 if(!___apiConfig.routes)
 {

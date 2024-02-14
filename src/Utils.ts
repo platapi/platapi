@@ -113,12 +113,7 @@ export class Utils {
             configPath = configPath ?? process.env.API_CONFIG_FILE ?? "./api.config.js";
 
             try {
-                if (!configPath) {
-                    // Should be caught below
-                    throw new Error();
-                }
-
-                configPath = path.resolve(process.cwd(), configPath ?? process.env.API_CONFIG_FILE);
+                configPath = path.resolve(process.cwd(), configPath);
 
                 configObject = require(configPath);
 

@@ -1,4 +1,4 @@
-import { isAxiosError } from "axios";
+const { isAxiosError } = require("axios");
 
 /** @type {import("platapi").PlatAPIConfigObject} */
 const apiConfig = {

@@ -51,7 +51,7 @@ export class DocGenerator {
         const apiRootDirectory = path.resolve(configObject.apiRootDirectory);
 
         const apiSpec: OpenAPIObject = {
-            openapi: "3.1.0",
+            openapi: "3.0.3",
             info: configObject.info,
             paths: {},
             components: {
@@ -603,7 +603,7 @@ export class DocGenerator {
         return type
             .getNonNullableType()
             .getText()
-            .replace(/Promise<(.+?)>/g, "$1");
+            .replace(/Promise<(.+)>/g, "$1");
     }
 
     private static _isNilType(type: Type): boolean {

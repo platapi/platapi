@@ -127,7 +127,7 @@ export class Utils {
                     configObject = config();
                 }
             } catch (e) {
-                throw new Error("No PlatAPI api.config.js file found.");
+                throw new Error(`No PlatAPI api.config.js file found. ${(e as Error).message}`);
             }
         }
 

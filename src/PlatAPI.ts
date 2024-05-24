@@ -99,7 +99,18 @@ export class PlatAPI {
                     extended: true
                 })
             );
-            this.app.use(bodyParser.json());
+            this.app.use(
+                bodyParser.json({
+                    reviver: function (_, value) {
+                        // we ignore non numbers and numbers that are lower than the safe integer value.
+                        if (typeof value !== "number" || Number.MAX_SAFE_INTEGER > value) {
+                            return value;
+                        }
+
+                        return value.toString();
+                    }
+                })
+            );
             this.app.use(bodyParser.text());
         }
 

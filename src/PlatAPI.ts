@@ -36,7 +36,7 @@ interface ExtendedRoute extends PlatAPIRoute {
     import?: () => Promise<any>;
 }
 
-const JSONbigString = require("json-bigint")({ storeAsString: true });
+const jsonBigIntToString = require("json-bigint")({ storeAsString: true });
 
 export class PlatAPI {
     readonly handler?: APIGatewayProxyHandler;
@@ -110,7 +110,7 @@ export class PlatAPI {
                     });
                     req.on("end", () => {
                         try {
-                            req.body = JSONbigString.parse(rawData);
+                            req.body = jsonBigIntToString.parse(rawData);
                             next();
                         } catch (err) {
                             res.status(400).send("Invalid JSON");

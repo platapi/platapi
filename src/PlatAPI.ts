@@ -36,8 +36,6 @@ interface ExtendedRoute extends PlatAPIRoute {
     import?: () => Promise<any>;
 }
 
-const jsonBigIntToString = require("json-bigint")({ storeAsString: true });
-
 export class PlatAPI {
     readonly handler?: APIGatewayProxyHandler;
     readonly app?: Express;
@@ -101,25 +99,18 @@ export class PlatAPI {
                     extended: true
                 })
             );
-            this.app.use((req, res, next) => {
-                // Only process JSON requests
-                if (req.is("application/json")) {
-                    let rawData = "";
-                    req.on("data", chunk => {
-                        rawData += chunk;
-                    });
-                    req.on("end", () => {
-                        try {
-                            req.body = jsonBigIntToString.parse(rawData);
-                            next();
-                        } catch (err) {
-                            res.status(400).send("Invalid JSON");
+            this.app.use(
+                bodyParser.json({
+                    reviver: function (_, value) {
+                        // we ignore non numbers and numbers that are lower than the safe integer value.
+                        if (typeof value !== "number" || Number.MAX_SAFE_INTEGER > value) {
+                            return value;
                         }
-                    });
-                } else {
-                    next();
-                }
-            });
+
+                        return value.toString();
+                    }
+                })
+            );
             this.app.use(bodyParser.text());
         }
 

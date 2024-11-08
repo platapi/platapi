@@ -11,6 +11,11 @@ import any = jasmine.any;
 export const POST = Utils.generateHTTPMethodDecorator("POST");
 
 /**
+ * A method decorator for any HTTP method
+ */
+export const ALL = Utils.generateHTTPMethodDecorator("ALL");
+
+/**
  * A method decorator for a GET endpoint
  */
 export const GET = Utils.generateHTTPMethodDecorator("GET");

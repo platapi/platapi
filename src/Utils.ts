@@ -10,7 +10,6 @@ import isFunction from "lodash/isFunction";
 import isString from "lodash/isString";
 import defaults from "lodash/defaults";
 import { Request } from "express/ts4.0";
-import util from "util";
 
 const CATCH_ALL_REGEX = /\.{3}(.+)/;
 const OPTIONAL_CATCH_ALL_REGEX = /\[\.{3}(.+)]/;
@@ -69,7 +68,7 @@ export class Utils {
     }
 
     static generateMethodHandler(theObject: any, httpMethod: string): PlatAPIManagedAPIHandler | undefined {
-        // Is there a key on this object that contains the
+        // Is there a key on this object that contains the HTTP method
         const handler = theObject[httpMethod.toLowerCase()] ?? theObject[httpMethod.toUpperCase()];
 
         let handlerConfig: PlatAPIManagedAPIHandlerConfig | undefined;
@@ -78,18 +77,27 @@ export class Utils {
         if (isArray(handler) && (handler as PlatAPIManagedAPIHandler).length >= 2) {
             handlerConfig = { ...(handler as PlatAPIManagedAPIHandler)[0] };
             handlerFunction = (handler as PlatAPIManagedAPIHandler)[1];
-        } else if (theObject.__httpMethods?.[httpMethod.toUpperCase()]) {
-            handlerFunction = theObject[theObject.__httpMethods?.[httpMethod.toUpperCase()]];
-            if (handlerFunction) {
-                handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
-            }
-        } else if (theObject?.prototype.__httpMethods?.[httpMethod.toUpperCase()]) {
-            // This is an instance function which means we need to create an instance of the object
-            const objectInstance = new theObject();
-            handlerFunction = objectInstance[theObject.prototype.__httpMethods[httpMethod.toUpperCase()]];
+        } else {
+            let handlerObject: any;
+            let httpMethods: { [method: string]: string } | undefined;
 
-            // Bind "this" to the object instance
-            //handlerFunction = handlerFunction?.bind(objectInstance); // TODO: this screws with the function parameter names
+            if (theObject.__httpMethods) {
+                httpMethods = theObject.__httpMethods;
+                handlerObject = theObject;
+            } else if (theObject.prototype?.__httpMethods) {
+                httpMethods = theObject.prototype.__httpMethods;
+                // This is an instance function which means we need to create an instance of the object
+                handlerObject = new theObject();
+            }
+
+            if (handlerObject && httpMethods) {
+                handlerFunction = handlerObject[httpMethods[httpMethod.toUpperCase()]];
+
+                // If we can't find a default HTTP method, look for one that handles ALL
+                if (!handlerFunction) {
+                    handlerFunction = handlerObject[httpMethods["ALL"]];
+                }
+            }
 
             if (handlerFunction) {
                 handlerConfig = Utils.getManagedAPIHandlerConfig(handlerFunction);
@@ -191,36 +199,41 @@ export class Utils {
     }
 
     public static nextRouteToExpressRoute(filename: string): string {
-        return (
-            filename
-                .replace(/index\..+$/, "") // Remove index.ext from all endpoints
-                .replace(/\.[^/.]+$/, "") // Remove file extensions
-                .replace(/\[([^/]+)]/g, (fullMatch, paramName) => {
-                    if (OPTIONAL_CATCH_ALL_REGEX.test(paramName)) {
-                        return paramName.replace(OPTIONAL_CATCH_ALL_REGEX, `:$1([\\S\\s]+)?`);
-                    } else if (CATCH_ALL_REGEX.test(paramName)) {
-                        return paramName.replace(CATCH_ALL_REGEX, `:$1([\\S\\s]+)`);
-                    }
+        return filename
+            .replace(/index\..+$/, "") // Remove index.ext from all endpoints
+            .replace(/\.[^/.]+$/, "") // Remove file extensions
+            .replace(/\/\[([^/]+)]/g, (fullMatch, paramName) => {
+                if (OPTIONAL_CATCH_ALL_REGEX.test(paramName)) {
+                    return paramName.replace(OPTIONAL_CATCH_ALL_REGEX, `{/*$1}`);
+                } else if (CATCH_ALL_REGEX.test(paramName)) {
+                    return paramName.replace(CATCH_ALL_REGEX, `/*$1`);
+                }
 
-                    return `:${paramName}`;
-                }) // Handle route parameters like [slug]
-                // .replace(/\[\[\.{3}(.+?)]]/g, ":$1(.+)?") // Handle optional catch-all routes like [[...slug]]
-                // .replace(/\[\.{3}(.+?)]/g, ":$1(.{1,}$)") // Handle catch-all routes like [...slug]
-                .replace(/\/$/, "")
-        ); // Remove trailing slashes
+                return `/:${paramName}`;
+            })
+            .replace(/\/$/, ""); // Remove trailing slashes
     }
 
     public static calculateRoutePriority(route: string): number {
         const parts = route.split("/");
-        return parts.reduce((sum, part, index) => {
-            let priority = 0;
-
-            if (part.startsWith(":")) {
-                priority = parts.length - index;
+        const result = parts.reduce((sum, part, index) => {
+            if (part.startsWith("index.")) {
+                sum -= 100;
+            } else if (part.startsWith("[[...")) {
+                sum -= 100;
+            } else if (part.startsWith("[...")) {
+                sum -= 2;
+            } else if (part.startsWith("[")) {
+                sum -= 1;
             }
 
-            return sum + priority;
-        }, 0);
+            return sum;
+        }, parts.length * 100);
+        return result;
+    }
+
+    public static compareRoutes(routeA: string, routeB: string) {
+        return Utils.calculateRoutePriority(routeB) - Utils.calculateRoutePriority(routeA);
     }
 
     public static generateAPIRoutesFromFiles(rootDirectory: string): PlatAPIRoute[] {
@@ -231,14 +244,14 @@ export class Utils {
 
             return files
                 .filter(filename => /.ts$|.js$/.test(filename))
+                .sort(Utils.compareRoutes)
                 .map(filename => {
                     let expressRoute = Utils.nextRouteToExpressRoute(filename.replace(rootDirectory, ""));
                     return {
                         endpoint: expressRoute,
                         file: filename
                     };
-                })
-                .sort((a, b) => Utils.calculateRoutePriority(a.endpoint) - Utils.calculateRoutePriority(b.endpoint));
+                });
         } catch (e) {
             return [];
         }

@@ -243,7 +243,7 @@ export class Utils {
             const files = Utils.walkFileTree(rootDirectory);
 
             return files
-                .filter(filename => !/^\./.test(filename)) // Filter out hidden files
+                .filter(filename => !/\/\./.test(filename)) // Filter out hidden files or directories
                 .filter(filename => /\.ts$|\.([c|m])?js$/.test(filename)) // Filter typescript and javascript files
                 .sort(Utils.compareRoutes)
                 .map(filename => {

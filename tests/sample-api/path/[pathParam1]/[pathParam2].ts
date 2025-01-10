@@ -7,11 +7,11 @@ export default class SampleAPIWithPathParams {
         pathParam1: string,
         pathParam2: string,
         @Header
-        headerparam: string,
+        headerParam: string,
         @Cookie
         cookieParam: string
     ): string[] {
-        return [pathParam1, pathParam2, headerparam, cookieParam];
+        return [pathParam1, pathParam2, headerParam, cookieParam];
     }
 
     /**

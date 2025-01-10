@@ -4,8 +4,8 @@ export default class SampleAPI {
     @GET
     static getEndpoint(
         @Optional
-        slug?: string
+        slug?: any[]
     ) {
-        return slug;
+        return Object.fromEntries((slug ?? []).map((value, index) => [index, value]));
     }
 }

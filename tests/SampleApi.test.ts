@@ -39,4 +39,24 @@ describe("sample-api", () => {
                 expect(response.body).toEqual(["hello", "world"]);
             });
     });
+
+    describe("/catchall/optional/*", () => {
+        it("acceots 0 path params", async () => {
+            await request
+                .get("/catchall/optional")
+                .expect(200)
+                .then(response => {
+                    expect(response.body).toEqual({});
+                });
+        });
+
+        it("properly transforms path params", async () => {
+            await request
+                .get("/catchall/optional/one/two/three")
+                .expect(200)
+                .then(response => {
+                    expect(response.body).toEqual({ 0: "one", 1: "two", 2: "three" });
+                });
+        });
+    });
 });

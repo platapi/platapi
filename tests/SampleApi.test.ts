@@ -59,4 +59,24 @@ describe("sample-api", () => {
                 });
         });
     });
+
+    describe("/catchall/enum/*", () => {
+        it("/catchall/enum/Dog", async () => {
+            await request
+                .get("/catchall/enum/Dog")
+                .expect(200)
+                .then(response => {
+                    expect(response.body).toEqual(["Dog"]);
+                });
+        });
+
+        it("/catchall/enum/Cat", async () => {
+            await request
+                .get("/catchall/enum/Cat")
+                .expect(200)
+                .then(response => {
+                    expect(response.body).toEqual(["Cat"]);
+                });
+        });
+    });
 });

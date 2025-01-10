@@ -22,8 +22,13 @@ describe("sample-api", () => {
         await request
             .get("/path/s/1")
             .set({
+                // required
                 headerParam: "world",
-                Cookie: ["session=eyJqd3QiOiJ...", "cookieParam=hello"]
+                Cookie: [
+                    "session=eyJqd3QiOiJ...",
+                    // required
+                    "cookieParam=hello"
+                ]
             })
             .expect(200)
             .then(response => {
@@ -41,7 +46,7 @@ describe("sample-api", () => {
     });
 
     describe("/catchall/optional/*", () => {
-        it("acceots 0 path params", async () => {
+        it("accepts 0 path params", async () => {
             await request
                 .get("/catchall/optional")
                 .expect(200)

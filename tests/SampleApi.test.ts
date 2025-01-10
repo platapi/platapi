@@ -18,6 +18,20 @@ describe("sample-api", () => {
         await request.get("/r1").expect(404);
     });
 
+    it("headers should be case insensitive", async () => {
+        await request
+            .get("/header/example")
+            .set({
+                HEADERPARAM1: "hello",
+                headerparam2: "world",
+                HeaderParam3: "peace"
+            })
+            .expect(200)
+            .then(response => {
+                expect(response.body).toEqual(["hello", "world", "peace"]);
+            });
+    });
+
     it("/path/s/1", async () => {
         await request
             .get("/path/s/1")

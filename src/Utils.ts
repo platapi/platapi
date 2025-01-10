@@ -302,7 +302,8 @@ export class Utils {
         baseSource: string | string[],
         parameterNameIsPartOfPath: boolean = true,
         autoConvert: boolean = true,
-        transformFunction?: (value: any) => any,
+        transformParameterNameFunction?: (name: any) => string,
+        transformParameterValueFunction?: (value: any) => any,
         extraConfig?: Partial<PlatAPIManagedAPIHandlerConfig>
     ) {
         return (target: Object, propertyKey: string | symbol, parameterIndex: number) => {
@@ -311,7 +312,8 @@ export class Utils {
             let source = castArray(baseSource);
 
             if (parameterNameIsPartOfPath) {
-                source = [...source, parameterName];
+                let name = !!transformParameterNameFunction ? transformParameterNameFunction(parameterName) : parameterName;
+                source = [...source, name];
             }
 
             Utils.setManagedAPIHandlerConfig(handlerFunction, {
@@ -319,7 +321,7 @@ export class Utils {
                     [parameterName]: {
                         autoConvert: autoConvert,
                         sources: [source],
-                        transformFunction: transformFunction
+                        transformFunction: transformParameterValueFunction
                     }
                 }
             });

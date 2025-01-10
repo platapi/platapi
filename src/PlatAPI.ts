@@ -323,7 +323,8 @@ export class PlatAPI {
             const inputSourcePaths = requirement.sources ?? [
                 ["request", "params", paramName],
                 ["request", "query", paramName],
-                ["request", "body", paramName]
+                ["request", "body", paramName],
+                ["request", "headers", paramName.toLowerCase()]
             ];
 
             const foundPath = inputSourcePaths.find(path => get(inputSource, path) !== undefined);

@@ -1,6 +1,6 @@
 {
     "name": "platapi",
-    "version": "1.0.4",
+    "version": "1.1.4",
     "description": "The easiest way to create an API to love.",
     "main": "./lib/src/index.js",
     "types": "./lib/src/index.d.ts",
@@ -63,11 +63,13 @@
         "@types/jsonwebtoken": "^8.5.8",
         "@types/lodash": "^4.14.182",
         "@types/node": "^17.0.31",
+        "@types/supertest": "^6.0.2",
         "@types/yargs": "^17.0.10",
         "axios": "1.7.4",
         "husky": "^8.0.0",
         "jest": "^29.5.0",
         "openapi3-ts": "^4.1.2",
+        "supertest": "^7.0.0",
         "ts-jest": "^29.1.0"
     }
 }

@@ -102,7 +102,7 @@ export const AllPath = Utils.generateParameterSourceDecorator(["request", "param
 /**
  * A parameter decorator to extract a single header from an HTTP request
  */
-export const Header = Utils.generateParameterSourceDecorator(["request", "headers"]);
+export const Header = Utils.generateParameterSourceDecorator(["request", "headers"], true, true, (name: string) => name.toLowerCase());
 
 /**
  * A parameter decorator to extract all headers from an HTTP request
@@ -116,6 +116,7 @@ export const BearerToken = Utils.generateParameterSourceDecorator(
     ["request", "headers", "authorization"],
     false,
     false,
+    undefined,
     token => {
         return token.replace(/Bearer\s+/i, "");
     },

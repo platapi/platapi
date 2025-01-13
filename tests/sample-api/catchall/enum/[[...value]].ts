@@ -1,11 +1,16 @@
 import { GET, Optional } from "../../../../src";
 
+enum PetSpecies {
+    Dog,
+    Cat
+}
+
 export default class SampleAPI {
     @GET
     static getEndpoint(
         @Optional
-        slug?: any[]
+        value?: PetSpecies[]
     ) {
-        return Object.fromEntries((slug ?? []).map((value, index) => [index, value]));
+        return value;
     }
 }

@@ -44,8 +44,8 @@ program
             args = [...args, `--${optionName}`, options[optionName]];
         }
 
-        // We need to use ts-node here so the doc generator can load typescript files
-        const child = spawn("node_modules/.bin/ts-node", args, {
+        // We need to use tsx here so the doc generator can load typescript files
+        const child = spawn("node_modules/.bin/tsx", args, {
             stdio: "inherit",
             env: {
                 ...process.env,

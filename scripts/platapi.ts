@@ -12,13 +12,17 @@ program
     .command("dev")
     .option("-c --config <string>", "the location of your api.config.js file", "./api.config.js")
     .action(async (options: any) => {
-        const child = spawn("node_modules/.bin/ts-node-dev", ["--watch", "./**/*.ts", "--ignore-watch", "node_modules/*", "--transpile-only", path.resolve(__dirname, "server")], {
-            stdio: "inherit",
-            env: {
-                ...process.env,
-                API_CONFIG_FILE: options.config
+        const child = spawn(
+            "node_modules/.bin/tsx",
+            ["watch", "--include", "./**/*.ts", "--exclude", "node_modules/*", "--clear-screen=false", path.resolve(__dirname, "server")],
+            {
+                stdio: "inherit",
+                env: {
+                    ...process.env,
+                    API_CONFIG_FILE: options.config
+                }
             }
-        });
+        );
     });
 
 program

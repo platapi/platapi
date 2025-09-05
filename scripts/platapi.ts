@@ -28,8 +28,9 @@ program
 program
     .command("build")
     .option("-c --config <string>", "the location of your api.config.js file", "./api.config.js")
+    .option("-s --sourcemap", "generate source maps", false)
     .action(async (options: any) => {
-        await build(options.config);
+        await build(options.config, options.sourcemap);
     });
 
 program

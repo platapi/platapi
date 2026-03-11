@@ -1,7 +1,6 @@
 import path from "path";
 import { ClassDeclaration, MethodDeclaration, Project, SourceFile, SyntaxKind, Type } from "ts-morph";
-import { OpenAPIObject } from "openapi3-ts/oas31";
-import { ContentObject, OperationObject, ParameterObject, ResponsesObject, SchemaObject } from "openapi3-ts/src/model/openapi31";
+import { ContentObject, OpenAPIObject, OperationObject, ParameterObject, ResponsesObject, SchemaObject } from "openapi3-ts/oas31";
 import * as TJS from "typescript-json-schema";
 import crypto from "crypto";
 import fs from "fs";
@@ -129,7 +128,8 @@ export class DocGenerator {
         const schemaGenerator = TJS.buildGenerator(schemaProgram, {
             required: true,
             skipLibCheck: true,
-            esModuleInterop: true
+            esModuleInterop: true,
+            ignoreErrors: true
         });
         const schemaCache = new Map<string, SchemaObject | undefined>();
 

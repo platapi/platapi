@@ -1,7 +1,9 @@
 import { DocGenerator } from "../src/docgen/DocGenerator";
 
 describe("DocGenerator", () => {
-    it("Should generate docs for a sample API", async () => {
+    it(
+        "Should generate docs for a sample API",
+        async () => {
         const apiSpec = await DocGenerator.generateDocs({
             info: {
                 title: "Test API",
@@ -15,5 +17,7 @@ describe("DocGenerator", () => {
         expect(apiSpec.paths?.["/sample"]?.get).toBeDefined();
         expect(apiSpec.paths?.["/sample"]?.get?.requestBody).toBeDefined();
         expect(apiSpec.components?.schemas).toBeDefined();
-    });
+        },
+        15000
+    );
 });

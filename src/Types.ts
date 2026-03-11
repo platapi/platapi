@@ -1,6 +1,6 @@
 import type { Logger, LogLevelDesc } from "loglevel";
 import type { RequestHandler, Request, Response } from "express";
-import type { InfoObject, OperationObject } from "openapi3-ts/src/model/openapi31";
+import type { InfoObject, OperationObject } from "openapi3-ts/oas31";
 import type { Express } from "express";
 import { SecuritySchemeObject } from "openapi3-ts/dist/model/openapi31";
 

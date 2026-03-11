@@ -22,7 +22,17 @@
   - add `--max-old-space-size <mb>` and `PLATAPI_MAX_OLD_SPACE_SIZE`
   - add `PLATAPI_NODE_OPTIONS` passthrough
 - tooling
-  - upgraded `typescript` and `typescript-json-schema`
+  - upgraded the packages directly used by `build` / `generate:docs`, including `rollup`, the Rollup plugins, `tsx`, `commander`, `fs-extra`, `lodash`, `ts-morph`, `typescript-json-schema`, and `openapi3-ts`
+
+## Dependency inventory
+
+Packages directly on the `build` / `generate:docs` path after the refresh:
+
+- CLI/runtime: `commander`, `tsx`, `fs-extra`, `lodash`
+- build path: `rollup`, `@rollup/plugin-commonjs`, `@rollup/plugin-json`, `@rollup/plugin-node-resolve`, `@rollup/plugin-terser`, `@optimize-lodash/rollup-plugin`, `typescript`, `tslib`
+- docs path: `ts-morph`, `typescript-json-schema`, `openapi3-ts`
+
+`ts-morph` is used heavily in docs generation, not in the Rollup build path. The build command no longer uses the Rollup TypeScript plugin or a full `ts-morph` project.
 
 ## Memory measurements
 
@@ -30,9 +40,9 @@ Synthetic repro project: `./.tmp/large-api` with 180 generated routes and nested
 
 | Command | Before | After | Delta | Notes |
 | --- | ---: | ---: | ---: | --- |
-| `platapi generate:docs` | 463872 KB | 368652 KB | -95220 KB (-20.5%) | peak RSS on the synthetic repro |
-| `platapi build` | 1130640 KB | 208324 KB | -922316 KB (-81.6%) | peak RSS on the synthetic repro |
-| `platapi build --no-minify` | 818604 KB | 181356 KB | -637248 KB (-77.8%) | lowest-memory build path measured |
+| `platapi generate:docs` | 463872 KB | 401892 KB | -61980 KB (-13.4%) | peak RSS on the synthetic repro after latest dependency upgrades |
+| `platapi build` | 1130640 KB | 227504 KB | -903136 KB (-79.9%) | peak RSS on the synthetic repro after latest dependency upgrades |
+| `platapi build --no-minify` | 818604 KB | 164440 KB | -654164 KB (-79.9%) | lowest-memory build path measured |
 
 Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showed:
 
@@ -44,7 +54,7 @@ Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showe
 Using `../spot-api` as a local repro target:
 
 - `generate:docs` now completes on Node 22 without an external `node --max-old-space-size=4096` wrapper
-  - peak RSS improved from `874364 KB` to `858092 KB` (`-16272 KB`, about `-1.9%`) on the local `../spot-api` checkout
+  - peak RSS changed from `874364 KB` to `880516 KB` (`+6152 KB`, about `+0.7%`) on the local `../spot-api` checkout after the dependency refresh, but it still completes successfully without the external heap wrapper
 - `build` no longer fails early on old-TypeScript syntax parsing, but the current `spot-api` checkout still has an unrelated Rollup error:
   - `"EpayCreateDirectDepositFields" is not exported by "src/types/Claim.ts"`
 

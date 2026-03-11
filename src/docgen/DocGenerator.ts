@@ -55,63 +55,64 @@ export class DocGenerator {
             }
         };
 
-        // Get all of our API routes
         const routes = Utils.generateAPIRoutesFromFiles(apiRootDirectory);
         const docProject = new Project({
             tsConfigFilePath: path.join(process.cwd(), "tsconfig.json"),
             skipAddingFilesFromTsConfig: true
         });
 
+        // Only add discovered route files so we do not pull the whole workspace into ts-morph.
         docProject.addSourceFilesAtPaths(routes.map(route => route.file!).filter((filePath): filePath is string => !!filePath));
         logMemory("docs:after-route-scan");
 
-        // Change route param formats from :param to {param}
         routes.forEach(route => (route.endpoint = route.endpoint.replace(/:(.+?)(\/|$)/g, `{$1}$2`)));
         const typeDefs = new Set<string>();
 
-        // Loop through all of our endpoints and extract all types from them
-        DocGenerator._forEachEndpoint(docProject, routes, (route, method, httpMethodName) => {
-            let partialBodyTypes: { name: string; type: string; optional: boolean }[] = [];
+        DocGenerator._forEachEndpoint(docProject, routes, (route, method) => {
+            const partialBodyTypes: { name: string; optional: boolean; type: string }[] = [];
 
-            for (let parameter of method.getParameters()) {
+            for (const parameter of method.getParameters()) {
                 const isPartialBodyParam = !!parameter.getDecorator("BodyPart");
                 const isOptional = !!parameter.getDecorator("Optional") || parameter.isOptional();
                 const parameterType = parameter.getType();
                 const parameterTypeDef = DocGenerator._generateTypeDefinition(parameterType);
-                if (parameterTypeDef) {
-                    if (isPartialBodyParam) {
-                        partialBodyTypes.push({
-                            name: parameter.getName(),
-                            type: DocGenerator._getTypeString(parameterType),
-                            optional: isOptional
-                        });
-                    } else {
-                        typeDefs.add(parameterTypeDef);
-                    }
+
+                if (!parameterTypeDef) {
+                    continue;
                 }
+
+                if (isPartialBodyParam) {
+                    partialBodyTypes.push({
+                        name: parameter.getName(),
+                        optional: isOptional,
+                        type: DocGenerator._getTypeString(parameterType)
+                    });
+                    continue;
+                }
+
+                typeDefs.add(parameterTypeDef);
             }
 
             if (partialBodyTypes.length > 0) {
-                const partialBodyTypeProps = partialBodyTypes.map(pbt => `${pbt.name}${pbt.optional ? "?" : ""}: ${pbt.type}`).join(";");
+                const partialBodyTypeProps = partialBodyTypes.map(typeDef => `${typeDef.name}${typeDef.optional ? "?" : ""}: ${typeDef.type}`).join(";");
                 typeDefs.add(`export interface _PartialBodyType${DocGenerator._createHash(route.endpoint + method)} {${partialBodyTypeProps}};`);
             }
 
-            // Generate a success response return type
             const returnTypeDef = DocGenerator._generateTypeDefinition(method.getReturnType());
             if (returnTypeDef) {
                 typeDefs.add(returnTypeDef);
             }
 
-            // Generate any error response types
-            const errorTypes = DocGenerator._getErrorTypesFromMethod(method);
-            for (let errorType of errorTypes) {
+            for (const errorType of DocGenerator._getErrorTypesFromMethod(method)) {
                 const errorTypeDef = DocGenerator._generateTypeDefinition(errorType);
-
                 if (errorTypeDef) {
                     typeDefs.add(errorTypeDef);
                 }
             }
         });
+
+        collectGarbage();
+        logMemory("docs:after-type-collection");
 
         // Generate a typescript file with all of our types
         const typeDefsString = [...typeDefs].join("\n");
@@ -142,189 +143,192 @@ export class DocGenerator {
 
         try {
             DocGenerator._forEachEndpoint(docProject, routes, (route, method, httpMethodName, sourceFile) => {
-            const pathParamNames = [...route.endpoint.matchAll(/\{(.+?)}/g)].map(match => match[1]);
+                const pathParamNames = [...route.endpoint.matchAll(/\{(.+?)}/g)].map(match => match[1]);
 
-            let endpoint: OperationObject = {
-                summary: DocGenerator._toSentenceCase(method.getName()),
-                parameters: [],
-                responses: {}
-            };
-
-            const [docs] = method.getJsDocs();
-            const paramDescriptions: Record<string, string> = {};
-            let isPublicEndpoint = true;
-            let requestBodyType: Type | undefined = undefined;
-
-            if (docs) {
-                endpoint.description = docs.getDescription();
-
-                for (const tag of docs.getTags()) {
-                    switch (tag.getTagName()) {
-                        case "arg":
-                        case "argument":
-                        case "param": {
-                            const paramDescription = tag.getCommentText();
-                            if (paramDescription && (tag as any).getName) {
-                                paramDescriptions[(tag as any).getName() as string] = paramDescription.replace(/^[\s-]*/, "");
-                            }
-                            break;
-                        }
-                        case "description": {
-                            endpoint.description = tag.getCommentText();
-                            break;
-                        }
-                        case "private": {
-                            isPublicEndpoint = false;
-                            break;
-                        }
-                        case "summary": {
-                            endpoint.summary = tag.getCommentText();
-                            break;
-                        }
-                        case "deprecated": {
-                            endpoint.deprecated = true;
-                            break;
-                        }
-                        case "tags": {
-                            const tags = tag.getCommentText();
-                            if (tags) {
-                                endpoint.tags = tags.split(/\s*,\s*/);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!isPublicEndpoint) {
-                return;
-            }
-
-            for (const parameter of method.getParameters()) {
-                const paramName = parameter.getName();
-                let isPublicParameter = true;
-
-                const param: ParameterObject = {
-                    name: paramName,
-                    description: paramDescriptions[paramName] ?? DocGenerator._toSentenceCase(paramName),
-                    in: "query",
-                    required: !parameter.isOptional()
+                let endpoint: OperationObject = {
+                    summary: DocGenerator._toSentenceCase(method.getName()),
+                    parameters: [],
+                    responses: {}
                 };
 
-                if (pathParamNames.includes(paramName)) {
-                    param.in = "path";
-                }
+                const [docs] = method.getJsDocs();
+                const paramDescriptions: Record<string, string> = {};
+                let isPublicEndpoint = true;
+                let requestBodyType: Type | undefined = undefined;
 
-                for (const decorator of parameter.getDecorators()) {
-                    const decoratorName = decorator.getName();
+                if (docs) {
+                    endpoint.description = docs.getDescription();
 
-                    switch (decoratorName) {
-                        case "BodyPart": {
-                            isPublicParameter = false;
-                            break;
-                        }
-                        case "Body": {
-                            isPublicParameter = false;
-                            requestBodyType = parameter.getType();
-                            break;
-                        }
-                        case "Optional": {
-                            param.required = false;
-                            break;
-                        }
-                        case "Required": {
-                            param.required = true;
-                            break;
-                        }
-                        case "Path": {
-                            param.in = "path";
-                            break;
-                        }
-                        case "Cookie": {
-                            param.in = "cookie";
-                            break;
-                        }
-                        case "Query": {
-                            param.in = "query";
-                            break;
-                        }
-                        case "Header": {
-                            param.in = "header";
-                            break;
-                        }
-                        case "AllCookies":
-                        case "AllPath":
-                        case "AllQuery":
-                        case "AllHeaders":
-                        case "Logger":
-                        case "Response":
-                        case "Request": {
-                            isPublicParameter = false;
-                            break;
+                    for (const tag of docs.getTags()) {
+                        switch (tag.getTagName()) {
+                            case "arg":
+                            case "argument":
+                            case "param": {
+                                const paramDescription = tag.getCommentText();
+                                if (paramDescription && (tag as any).getName) {
+                                    paramDescriptions[(tag as any).getName() as string] = paramDescription.replace(/^[\s-]*/, "");
+                                }
+                                break;
+                            }
+                            case "description": {
+                                endpoint.description = tag.getCommentText();
+                                break;
+                            }
+                            case "private": {
+                                isPublicEndpoint = false;
+                                break;
+                            }
+                            case "summary": {
+                                endpoint.summary = tag.getCommentText();
+                                break;
+                            }
+                            case "deprecated": {
+                                endpoint.deprecated = true;
+                                break;
+                            }
+                            case "tags": {
+                                const tags = tag.getCommentText();
+                                if (tags) {
+                                    endpoint.tags = tags.split(/\s*,\s*/);
+                                }
+                                break;
+                            }
                         }
                     }
                 }
 
-                if (!isPublicParameter) {
-                    continue;
+                if (!isPublicEndpoint) {
+                    return;
                 }
 
-                if (!param.schema) {
-                    param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaGenerator, schemaCache);
-                }
+                for (const parameter of method.getParameters()) {
+                    const paramName = parameter.getName();
+                    let isPublicParameter = true;
 
-                endpoint.parameters?.push(param);
-            }
+                    const param: ParameterObject = {
+                        name: paramName,
+                        description: paramDescriptions[paramName] ?? DocGenerator._toSentenceCase(paramName),
+                        in: "query",
+                        required: !parameter.isOptional()
+                    };
 
-            let requestBodySchema = DocGenerator._generateAPISchema(
-                requestBodyType ?? `_PartialBodyType${DocGenerator._createHash(route.endpoint + method)}`,
-                apiSpec,
-                schemaGenerator,
-                schemaCache
-            );
+                    if (pathParamNames.includes(paramName)) {
+                        param.in = "path";
+                    }
 
-            if (requestBodySchema) {
-                endpoint.requestBody = {
-                    content: DocGenerator._generateMimeTypeSchema(requestBodySchema)
-                };
-            }
+                    for (const decorator of parameter.getDecorators()) {
+                        const decoratorName = decorator.getName();
 
-            // Load the API module and see if there are any docs within decorators
-            const apiModule = require(sourceFile.getFilePath()).default;
-            const methodHandler = Utils.generateMethodHandler(apiModule, httpMethodName);
-            const handlerSettings = methodHandler?.[0];
-
-            endpoint.responses = DocGenerator._generateResponseSchemaForMethod(method, apiSpec, schemaGenerator, schemaCache, configObject);
-
-            if (handlerSettings) {
-                // Does this method have any overriding documentation?
-                const docsDecorator = method.getDecorator("Docs");
-                if (!!docsDecorator) {
-                    try {
-                        if (handlerSettings.docs) {
-                            Utils.mergeObjects(endpoint, handlerSettings.docs);
+                        switch (decoratorName) {
+                            case "BodyPart": {
+                                isPublicParameter = false;
+                                break;
+                            }
+                            case "Body": {
+                                isPublicParameter = false;
+                                requestBodyType = parameter.getType();
+                                break;
+                            }
+                            case "Optional": {
+                                param.required = false;
+                                break;
+                            }
+                            case "Required": {
+                                param.required = true;
+                                break;
+                            }
+                            case "Path": {
+                                param.in = "path";
+                                break;
+                            }
+                            case "Cookie": {
+                                param.in = "cookie";
+                                break;
+                            }
+                            case "Query": {
+                                param.in = "query";
+                                break;
+                            }
+                            case "Header": {
+                                param.in = "header";
+                                break;
+                            }
+                            case "AllCookies":
+                            case "AllPath":
+                            case "AllQuery":
+                            case "AllHeaders":
+                            case "Logger":
+                            case "Response":
+                            case "Request": {
+                                isPublicParameter = false;
+                                break;
+                            }
                         }
-                    } catch (e) {}
+                    }
+
+                    if (!isPublicParameter) {
+                        continue;
+                    }
+
+                    if (!param.schema) {
+                        param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaGenerator, schemaCache, undefined, parameter);
+                    }
+
+                    endpoint.parameters?.push(param);
                 }
 
-                // Does this endpoint have any security schemes?
-                if (handlerSettings.securitySchemes) {
-                    for (let securityScheme of handlerSettings.securitySchemes) {
-                        const authName = `${securityScheme.type}Auth`;
-                        set(apiSpec, ["components", "securitySchemes", authName], securityScheme);
+                const requestBodySchema = DocGenerator._generateAPISchema(
+                    requestBodyType ?? `_PartialBodyType${DocGenerator._createHash(route.endpoint + method)}`,
+                    apiSpec,
+                    schemaGenerator,
+                    schemaCache,
+                    undefined,
+                    method
+                );
 
-                        if (!endpoint.security) {
-                            endpoint.security = [];
+                if (requestBodySchema) {
+                    endpoint.requestBody = {
+                        content: DocGenerator._generateMimeTypeSchema(requestBodySchema)
+                    };
+                }
+
+                // Clear the route module from Node's cache after reading decorator metadata so the
+                // docs pass does not retain every route implementation and its dependency tree.
+                const apiModulePath = require.resolve(sourceFile.getFilePath());
+                const apiModule = require(apiModulePath).default;
+                const methodHandler = Utils.generateMethodHandler(apiModule, httpMethodName);
+                const handlerSettings = methodHandler?.[0];
+                delete require.cache[apiModulePath];
+
+                endpoint.responses = DocGenerator._generateResponseSchemaForMethod(method, apiSpec, schemaGenerator, schemaCache, configObject);
+
+                if (handlerSettings) {
+                    const docsDecorator = method.getDecorator("Docs");
+                    if (!!docsDecorator) {
+                        try {
+                            if (handlerSettings.docs) {
+                                Utils.mergeObjects(endpoint, handlerSettings.docs);
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (handlerSettings.securitySchemes) {
+                        for (const securityScheme of handlerSettings.securitySchemes) {
+                            const authName = `${securityScheme.type}Auth`;
+                            set(apiSpec, ["components", "securitySchemes", authName], securityScheme);
+
+                            if (!endpoint.security) {
+                                endpoint.security = [];
+                            }
+
+                            endpoint.security.push({
+                                [authName]: []
+                            });
                         }
-
-                        endpoint.security.push({
-                            [authName]: []
-                        });
                     }
                 }
-            }
 
-            set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);
+                set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);
             });
         } finally {
             await fs.promises.rm(typeDefFilename, { force: true });
@@ -403,7 +407,7 @@ export class DocGenerator {
 
         // Generate our return type first
         const returnType = method.getReturnType();
-        let returnTypeSchema = DocGenerator._generateAPISchema(returnType, apiSpec, generator, schemaCache);
+        let returnTypeSchema = DocGenerator._generateAPISchema(returnType, apiSpec, generator, schemaCache, undefined, method);
 
         if (returnTypeSchema) {
             if (config.returnFriendlyResponses) {
@@ -424,7 +428,7 @@ export class DocGenerator {
         const errorTypes = DocGenerator._getErrorTypesFromMethod(method);
 
         for (let errorType of errorTypes) {
-            let rawErrorSchema = DocGenerator._generateAPISchema(errorType, apiSpec, generator, schemaCache);
+            let rawErrorSchema = DocGenerator._generateAPISchema(errorType, apiSpec, generator, schemaCache, undefined, method);
 
             if (!rawErrorSchema) {
                 continue;
@@ -497,13 +501,14 @@ export class DocGenerator {
         apiSpec: OpenAPIObject,
         generator: TJS.JsonSchemaGenerator,
         schemaCache: Map<string, SchemaObject | undefined>,
-        defaultValue?: any
+        defaultValue?: any,
+        enclosingNode?: MethodDeclaration | import("ts-morph").Node
     ): SchemaObject | undefined {
         if (!isString(type) && DocGenerator._isNilType(type)) {
             return;
         }
 
-        const parameterTypeName = isString(type) ? (type as string) : DocGenerator._generateTypeDefinitionName(type);
+        const parameterTypeName = isString(type) ? (type as string) : DocGenerator._generateTypeDefinitionName(type, enclosingNode);
         const cacheKey = `schema:${parameterTypeName}`;
 
         try {
@@ -647,14 +652,14 @@ export class DocGenerator {
         }
     }
 
-    private static _generateTypeDefinitionName(type: Type): string {
-        return `_Type${DocGenerator._createHash(DocGenerator._getTypeString(type))}`;
+    private static _generateTypeDefinitionName(type: Type, enclosingNode?: MethodDeclaration | import("ts-morph").Node): string {
+        return `_Type${DocGenerator._createHash(DocGenerator._getTypeString(type, enclosingNode))}`;
     }
 
-    private static _getTypeString(type: Type): string {
+    private static _getTypeString(type: Type, enclosingNode?: MethodDeclaration | import("ts-morph").Node): string {
         return type
             .getNonNullableType()
-            .getText()
+            .getText(enclosingNode, 1)
             .replace(/Promise<(.+)>/g, "$1");
     }
 
@@ -663,14 +668,14 @@ export class DocGenerator {
         return rawTypeName === "undefined" || rawTypeName === "void" || rawTypeName === "never";
     }
 
-    private static _generateTypeDefinition(type: Type, ignoreNil: boolean = true): string | undefined {
+    private static _generateTypeDefinition(type: Type, enclosingNode?: MethodDeclaration | import("ts-morph").Node, ignoreNil: boolean = true): string | undefined {
         if (ignoreNil && DocGenerator._isNilType(type)) {
             return;
         }
 
-        const rawTypeName = DocGenerator._getTypeString(type);
+        const rawTypeName = DocGenerator._getTypeString(type, enclosingNode);
 
-        const exportedTypeName = DocGenerator._generateTypeDefinitionName(type);
+        const exportedTypeName = DocGenerator._generateTypeDefinitionName(type, enclosingNode);
         return `export type ${exportedTypeName} = ${rawTypeName};`;
     }
 

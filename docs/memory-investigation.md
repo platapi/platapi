@@ -23,6 +23,7 @@
   - add `PLATAPI_NODE_OPTIONS` passthrough
 - tooling
   - upgraded the packages directly used by `build` / `generate:docs`, including `rollup`, the Rollup plugins, `tsx`, `commander`, `fs-extra`, `lodash`, `ts-morph`, `typescript-json-schema`, and `openapi3-ts`
+  - added `yarn test:build-docs` so the synthetic build/docs verification and RSS logging can be collected in one command
 
 ## Dependency inventory
 
@@ -34,15 +35,17 @@ Packages directly on the `build` / `generate:docs` path after the refresh:
 
 `ts-morph` is used heavily in docs generation, not in the Rollup build path. The build command no longer uses the Rollup TypeScript plugin or a full `ts-morph` project.
 
+I also reviewed the current `ts-morph` and `typescript-json-schema` docs while tuning this. The best-performing setup here was still: load only the discovered route files into a single `ts-morph` project, reuse one schema generator, and avoid extra project churn that looked appealing in theory but increased peak RSS on the real repo.
+
 ## Memory measurements
 
 Synthetic repro project: `./.tmp/large-api` with 180 generated routes and nested response/body types. Generate it with `node ./scripts/generate-memory-fixture.js`.
 
 | Command | Before | After | Delta | Notes |
 | --- | ---: | ---: | ---: | --- |
-| `platapi generate:docs` | 463872 KB | 401892 KB | -61980 KB (-13.4%) | peak RSS on the synthetic repro after latest dependency upgrades |
+| `platapi generate:docs` | 463872 KB | 379548 KB | -84324 KB (-18.2%) | peak RSS from `yarn test:build-docs` on the synthetic repro |
 | `platapi build` | 1130640 KB | 227504 KB | -903136 KB (-79.9%) | peak RSS on the synthetic repro after latest dependency upgrades |
-| `platapi build --no-minify` | 818604 KB | 164440 KB | -654164 KB (-79.9%) | lowest-memory build path measured |
+| `platapi build --no-minify` | 818604 KB | 169432 KB | -649172 KB (-79.3%) | lowest-memory build path measured |
 
 Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showed:
 
@@ -54,7 +57,7 @@ Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showe
 Using `../spot-api` as a local repro target:
 
 - `generate:docs` now completes on Node 22 without an external `node --max-old-space-size=4096` wrapper
-  - peak RSS changed from `874364 KB` to `880516 KB` (`+6152 KB`, about `+0.7%`) on the local `../spot-api` checkout after the dependency refresh, but it still completes successfully without the external heap wrapper
+  - peak RSS improved from `874364 KB` to `748524 KB` (`-125840 KB`, about `-14.4%`) on the local `../spot-api` checkout while still completing successfully without the external heap wrapper
 - `build` no longer fails early on old-TypeScript syntax parsing, but the current `spot-api` checkout still has an unrelated Rollup error:
   - `"EpayCreateDirectDepositFields" is not exported by "src/types/Claim.ts"`
 
@@ -67,6 +70,7 @@ From this repo:
 ```bash
 yarn build
 yarn test --runInBand
+yarn test:build-docs
 node ./scripts/generate-memory-fixture.js
 /usr/bin/time -v node_modules/.bin/tsx ./scripts/platapi.ts build -c ./.tmp/large-api/api.config.js
 /usr/bin/time -v node_modules/.bin/tsx ./scripts/generate-docs.ts -c ./.tmp/large-api/api.config.js -o ./.tmp/large-api/docs.json

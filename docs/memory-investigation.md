@@ -28,11 +28,11 @@
 
 Synthetic repro project: `./.tmp/large-api` with 180 generated routes and nested response/body types. Generate it with `node ./scripts/generate-memory-fixture.js`.
 
-| Command | Before | After | Notes |
-| --- | ---: | ---: | --- |
-| `platapi generate:docs` | 463872 KB | 367132 KB | about 21% lower peak RSS |
-| `platapi build` | 1130640 KB | 212084 KB | about 81% lower peak RSS on the synthetic repro |
-| `platapi build --no-minify` | 818604 KB | 181356 KB | lowest-memory build path |
+| Command | Before | After | Delta | Notes |
+| --- | ---: | ---: | ---: | --- |
+| `platapi generate:docs` | 463872 KB | 368652 KB | -95220 KB (-20.5%) | peak RSS on the synthetic repro |
+| `platapi build` | 1130640 KB | 208324 KB | -922316 KB (-81.6%) | peak RSS on the synthetic repro |
+| `platapi build --no-minify` | 818604 KB | 181356 KB | -637248 KB (-77.8%) | lowest-memory build path measured |
 
 Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showed:
 
@@ -44,6 +44,7 @@ Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showe
 Using `../spot-api` as a local repro target:
 
 - `generate:docs` now completes on Node 22 without an external `node --max-old-space-size=4096` wrapper
+  - peak RSS improved from `874364 KB` to `858092 KB` (`-16272 KB`, about `-1.9%`) on the local `../spot-api` checkout
 - `build` no longer fails early on old-TypeScript syntax parsing, but the current `spot-api` checkout still has an unrelated Rollup error:
   - `"EpayCreateDirectDepositFields" is not exported by "src/types/Claim.ts"`
 

@@ -2,9 +2,29 @@
 
 import { spawn } from "child_process";
 import path from "path";
-import { build } from "./build";
+import { buildBuildCommandArgs, getDefaultHeapSize, getHeavyCommandExecArgs } from "./HeavyCommandUtils";
 
 const { program } = require("commander");
+
+function runHeavyCommand(scriptPath: string, scriptArgs: string[], options: { env?: NodeJS.ProcessEnv; maxOldSpaceSize?: string | number }) {
+    const execArgs = getHeavyCommandExecArgs({
+        processExecArgv: process.execArgv,
+        maxOldSpaceSize: options.maxOldSpaceSize,
+        nodeOptions: process.env.PLATAPI_NODE_OPTIONS,
+        scriptArgs,
+        scriptPath,
+        tsxCliPath: require.resolve("tsx/cli")
+    });
+
+    if (options.maxOldSpaceSize && execArgs[0] === `--max-old-space-size=${options.maxOldSpaceSize}`) {
+        console.log(`Using Node heap limit ${options.maxOldSpaceSize}MB for this command.`);
+    }
+
+    return spawn(process.execPath, execArgs, {
+        stdio: "inherit",
+        env: options.env ?? process.env
+    });
+}
 
 program.name("platapi").description("PlatAPI command line interface").version("0.1.0");
 
@@ -29,8 +49,15 @@ program
     .command("build")
     .option("-c --config <string>", "the location of your api.config.js file", "./api.config.js")
     .option("-s --sourcemap", "generate source maps", false)
+    .option("--no-minify", "skip minification to reduce memory usage and build time")
+    .option("--max-old-space-size <mb>", "set the Node.js heap limit for this command")
     .action(async (options: any) => {
-        await build(options.config, options.sourcemap);
+        const child = runHeavyCommand(path.resolve(__dirname, "build-command"), buildBuildCommandArgs(options), {
+            env: process.env,
+            maxOldSpaceSize: options.maxOldSpaceSize ?? getDefaultHeapSize()
+        });
+
+        child.on("exit", code => process.exit(code ?? 0));
     });
 
 program
@@ -38,21 +65,24 @@ program
     .option("-d --defaultSpecFile <string>", "the default OpenAPI 3.1 spec for your API— this will be merged in with the generated documentation")
     .option("-c --config <string>", "the location of your api.config.js file", "./api.config.js")
     .option("-o, --outfile <string>", "output docs to a file, otherwise will print to console.")
+    .option("--max-old-space-size <mb>", "set the Node.js heap limit for this command")
     .action(async (options: any) => {
-        let args = [path.resolve(__dirname, "generate-docs")];
+        const args = [
+            "--config",
+            options.config,
+            ...(options.defaultSpecFile ? ["--defaultSpecFile", options.defaultSpecFile] : []),
+            ...(options.outfile ? ["--outfile", options.outfile] : [])
+        ];
 
-        for (let optionName of Object.keys(options)) {
-            args = [...args, `--${optionName}`, options[optionName]];
-        }
-
-        // We need to use tsx here so the doc generator can load typescript files
-        const child = spawn("node_modules/.bin/tsx", args, {
-            stdio: "inherit",
+        const child = runHeavyCommand(path.resolve(__dirname, "generate-docs"), args, {
             env: {
                 ...process.env,
                 API_CONFIG_FILE: options.config
-            }
+            },
+            maxOldSpaceSize: options.maxOldSpaceSize ?? getDefaultHeapSize()
         });
+
+        child.on("exit", code => process.exit(code ?? 0));
     });
 
 program.parse();

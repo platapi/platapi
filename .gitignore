@@ -150,3 +150,5 @@ lib
 .husky
 
 build
+.tmp/
+*.heapsnapshot

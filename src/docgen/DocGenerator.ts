@@ -13,12 +13,9 @@ import { Utils } from "../Utils";
 import { PlatAPIConfig, PlatAPIConfigObject, PlatAPIRoute } from "../Types";
 import { Docs } from "../Decorators";
 import get from "lodash/get";
+import { collectGarbage, logMemory } from "../MemoryUtils";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
-
-const docProject = new Project({
-    tsConfigFilePath: path.join(process.cwd(), "tsconfig.json")
-});
 
 const HAPI_SUCCESS_SCHEMA = {
     type: "object",
@@ -61,13 +58,20 @@ export class DocGenerator {
 
         // Get all of our API routes
         const routes = Utils.generateAPIRoutesFromFiles(apiRootDirectory);
+        const docProject = new Project({
+            tsConfigFilePath: path.join(process.cwd(), "tsconfig.json"),
+            skipAddingFilesFromTsConfig: true
+        });
+
+        docProject.addSourceFilesAtPaths(routes.map(route => route.file!).filter((filePath): filePath is string => !!filePath));
+        logMemory("docs:after-route-scan");
 
         // Change route param formats from :param to {param}
         routes.forEach(route => (route.endpoint = route.endpoint.replace(/:(.+?)(\/|$)/g, `{$1}$2`)));
         const typeDefs = new Set<string>();
 
         // Loop through all of our endpoints and extract all types from them
-        DocGenerator._forEachEndpoint(routes, (route, method, httpMethodName) => {
+        DocGenerator._forEachEndpoint(docProject, routes, (route, method, httpMethodName) => {
             let partialBodyTypes: { name: string; type: string; optional: boolean }[] = [];
 
             for (let parameter of method.getParameters()) {
@@ -114,14 +118,30 @@ export class DocGenerator {
         const typeDefsString = [...typeDefs].join("\n");
         const typeDefFilename = path.join(os.tmpdir(), `${DocGenerator._createHash(typeDefsString)}.ts`);
         await fs.promises.writeFile(typeDefFilename, typeDefsString);
+        collectGarbage();
+        logMemory("docs:after-type-defs");
 
         const schemaProgram = TJS.getProgramFromFiles([typeDefFilename], {
             skipLibCheck: true,
             esModuleInterop: true,
             allowSyntheticDefaultImports: true
         });
+        const schemaGenerator = TJS.buildGenerator(schemaProgram, {
+            required: true,
+            skipLibCheck: true,
+            esModuleInterop: true
+        });
+        const schemaCache = new Map<string, SchemaObject | undefined>();
 
-        DocGenerator._forEachEndpoint(routes, (route, method, httpMethodName, sourceFile) => {
+        if (!schemaGenerator) {
+            throw new Error("Unable to create JSON schema generator for docs.");
+        }
+
+        collectGarbage();
+        logMemory("docs:after-schema-program");
+
+        try {
+            DocGenerator._forEachEndpoint(docProject, routes, (route, method, httpMethodName, sourceFile) => {
             const pathParamNames = [...route.endpoint.matchAll(/\{(.+?)}/g)].map(match => match[1]);
 
             let endpoint: OperationObject = {
@@ -250,7 +270,7 @@ export class DocGenerator {
                 }
 
                 if (!param.schema) {
-                    param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaProgram);
+                    param.schema = DocGenerator._generateAPISchema(parameter.getType(), apiSpec, schemaGenerator, schemaCache);
                 }
 
                 endpoint.parameters?.push(param);
@@ -259,7 +279,8 @@ export class DocGenerator {
             let requestBodySchema = DocGenerator._generateAPISchema(
                 requestBodyType ?? `_PartialBodyType${DocGenerator._createHash(route.endpoint + method)}`,
                 apiSpec,
-                schemaProgram
+                schemaGenerator,
+                schemaCache
             );
 
             if (requestBodySchema) {
@@ -273,7 +294,7 @@ export class DocGenerator {
             const methodHandler = Utils.generateMethodHandler(apiModule, httpMethodName);
             const handlerSettings = methodHandler?.[0];
 
-            endpoint.responses = DocGenerator._generateResponseSchemaForMethod(method, apiSpec, schemaProgram, configObject);
+            endpoint.responses = DocGenerator._generateResponseSchemaForMethod(method, apiSpec, schemaGenerator, schemaCache, configObject);
 
             if (handlerSettings) {
                 // Does this method have any overriding documentation?
@@ -304,7 +325,12 @@ export class DocGenerator {
             }
 
             set(apiSpec.paths!, [route.endpoint, httpMethodName], endpoint);
-        });
+            });
+        } finally {
+            await fs.promises.rm(typeDefFilename, { force: true });
+            collectGarbage();
+            logMemory("docs:after-endpoints");
+        }
 
         return apiSpec;
     }
@@ -366,12 +392,18 @@ export class DocGenerator {
         }
     }
 
-    private static _generateResponseSchemaForMethod(method: MethodDeclaration, apiSpec: OpenAPIObject, program: TJS.Program, config: PlatAPIConfigObject): ResponsesObject {
+    private static _generateResponseSchemaForMethod(
+        method: MethodDeclaration,
+        apiSpec: OpenAPIObject,
+        generator: TJS.JsonSchemaGenerator,
+        schemaCache: Map<string, SchemaObject | undefined>,
+        config: PlatAPIConfigObject
+    ): ResponsesObject {
         const responses: ResponsesObject = {};
 
         // Generate our return type first
         const returnType = method.getReturnType();
-        let returnTypeSchema = DocGenerator._generateAPISchema(returnType, apiSpec, program);
+        let returnTypeSchema = DocGenerator._generateAPISchema(returnType, apiSpec, generator, schemaCache);
 
         if (returnTypeSchema) {
             if (config.returnFriendlyResponses) {
@@ -392,7 +424,7 @@ export class DocGenerator {
         const errorTypes = DocGenerator._getErrorTypesFromMethod(method);
 
         for (let errorType of errorTypes) {
-            let rawErrorSchema = DocGenerator._generateAPISchema(errorType, apiSpec, program);
+            let rawErrorSchema = DocGenerator._generateAPISchema(errorType, apiSpec, generator, schemaCache);
 
             if (!rawErrorSchema) {
                 continue;
@@ -460,49 +492,63 @@ export class DocGenerator {
         return types;
     }
 
-    private static _generateAPISchema(type: Type | string, apiSpec: OpenAPIObject, program: TJS.Program, defaultValue?: any): SchemaObject | undefined {
+    private static _generateAPISchema(
+        type: Type | string,
+        apiSpec: OpenAPIObject,
+        generator: TJS.JsonSchemaGenerator,
+        schemaCache: Map<string, SchemaObject | undefined>,
+        defaultValue?: any
+    ): SchemaObject | undefined {
         if (!isString(type) && DocGenerator._isNilType(type)) {
             return;
         }
 
         const parameterTypeName = isString(type) ? (type as string) : DocGenerator._generateTypeDefinitionName(type);
+        const cacheKey = `schema:${parameterTypeName}`;
 
         try {
-            let schema = TJS.generateSchema(program, parameterTypeName, {
-                required: true,
-                skipLibCheck: true,
-                esModuleInterop: true
-            });
+            let schema = schemaCache.get(cacheKey);
+
+            if (schema === undefined) {
+                const generatedSchema = generator.getSchemaForSymbol(parameterTypeName);
+                schema = generatedSchema ? (DocGenerator._normalizeSchema(generatedSchema) as SchemaObject) : undefined;
+
+                if (schema) {
+                    const { definitions, ...restOfSchema } = schema as SchemaObject & { definitions?: Record<string, SchemaObject> };
+                    if (definitions) {
+                        apiSpec.components!.schemas = {
+                            ...apiSpec.components!.schemas,
+                            ...definitions
+                        };
+                    }
+
+                    schema = restOfSchema as SchemaObject;
+                }
+
+                schemaCache.set(cacheKey, schema);
+            }
 
             if (schema) {
-                schema = DocGenerator._normalizeSchema(schema);
+                const returnSchema = JSON.parse(JSON.stringify(schema)) as SchemaObject;
 
                 if (defaultValue) {
-                    switch (schema.type) {
+                    switch (returnSchema.type) {
                         case "number": {
-                            schema.default = Number(defaultValue);
+                            returnSchema.default = Number(defaultValue);
                             break;
                         }
                         case "boolean": {
-                            schema.default = defaultValue === "true" || defaultValue === true;
+                            returnSchema.default = defaultValue === "true" || defaultValue === true;
                             break;
                         }
                         default: {
-                            schema.default = defaultValue;
+                            returnSchema.default = defaultValue;
                             break;
                         }
                     }
                 }
 
-                const { definitions, ...restOfSchema } = schema;
-                if (definitions) {
-                    apiSpec.components!.schemas = {
-                        ...apiSpec.components!.schemas,
-                        ...(definitions as any)
-                    };
-                }
-
-                return restOfSchema as SchemaObject;
+                return returnSchema;
             }
         } catch (e) {
             // An error is reasonable to expect here sometimes
@@ -554,7 +600,11 @@ export class DocGenerator {
         return sentence;
     }
 
-    private static _forEachEndpoint(routes: PlatAPIRoute[], predicate: (route: PlatAPIRoute, method: MethodDeclaration, httpMethodName: string, sourceFile: SourceFile) => void) {
+    private static _forEachEndpoint(
+        docProject: Project,
+        routes: PlatAPIRoute[],
+        predicate: (route: PlatAPIRoute, method: MethodDeclaration, httpMethodName: string, sourceFile: SourceFile) => void
+    ) {
         for (let route of routes) {
             if (!route.file) {
                 continue;
@@ -592,6 +642,8 @@ export class DocGenerator {
 
                 predicate(route, method, httpMethodName, sourceFile);
             }
+
+            sourceFile.forgetDescendants();
         }
     }
 

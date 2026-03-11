@@ -54,14 +54,9 @@ Phase-level heap logs from `PLATAPI_DEBUG_MEMORY=1` on the synthetic repro showe
 
 ## Real-project verification
 
-Using `../spot-api` as a local repro target:
-
-- `generate:docs` now completes on Node 22 without an external `node --max-old-space-size=4096` wrapper
-  - peak RSS improved from `874364 KB` to `748524 KB` (`-125840 KB`, about `-14.4%`) on the local `../spot-api` checkout while still completing successfully without the external heap wrapper
-- `build` no longer fails early on old-TypeScript syntax parsing, but the current `spot-api` checkout still has an unrelated Rollup error:
-  - `"EpayCreateDirectDepositFields" is not exported by "src/types/Claim.ts"`
-
-That means the memory fix is in place, but this specific local `spot-api` checkout still needs that import/export issue resolved before build can complete end-to-end.
+- `generate:docs` now completes on a large real TypeScript API project on Node 22 without an external `node --max-old-space-size=4096` wrapper
+- in that real-project repro, peak RSS improved from `874364 KB` to `748524 KB` (`-125840 KB`, about `-14.4%`)
+- the remaining build failure in that local repro project is unrelated to the memory work and comes from an application-level Rollup export mismatch
 
 ## How to verify
 
@@ -74,13 +69,6 @@ yarn test:build-docs
 node ./scripts/generate-memory-fixture.js
 /usr/bin/time -v node_modules/.bin/tsx ./scripts/platapi.ts build -c ./.tmp/large-api/api.config.js
 /usr/bin/time -v node_modules/.bin/tsx ./scripts/generate-docs.ts -c ./.tmp/large-api/api.config.js -o ./.tmp/large-api/docs.json
-```
-
-From `../spot-api`:
-
-```bash
-/usr/bin/time -v ../platapi/node_modules/.bin/tsx ../platapi/scripts/platapi.ts generate:docs -c ./api.config.js -o /tmp/spot-api-openapi.json
-/usr/bin/time -v ../platapi/node_modules/.bin/tsx ../platapi/scripts/platapi.ts build -c ./api.config.js
 ```
 
 If you want to tune the heap explicitly without wrapping the command yourself:
